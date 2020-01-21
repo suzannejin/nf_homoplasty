@@ -42,7 +42,14 @@ RUN wget http://www.clustal.org/omega/clustal-omega-1.2.4.tar.gz && \
     make install && \
     rm /clustal-omega-1.2.4.tar.gz
 
-#install CLUSTAL W
+#install CLUSTALO w1
+RUN wget http://www.clustal.org/download/1.X/ftp-igbmc.u-strasbg.fr/pub/ClustalW/clustalw1.83.linux.tar.gz && \
+    tar -zxf clustalw1.83.linux.tar.gz && \
+    cd clustalw1.83.linux && \
+    cp clustalw /bin/. && \
+    rm /clustalw1.83.linux.tar.gz
+
+#install CLUSTAL w2
 RUN wget http://www.clustal.org/download/current/clustalw-2.1.tar.gz && \
     tar -zxf clustalw-2.1.tar.gz && \
     cd clustalw-2.1 && \
@@ -51,9 +58,13 @@ RUN wget http://www.clustal.org/download/current/clustalw-2.1.tar.gz && \
     make install && \
     rm /clustalw-2.1.tar.gz
 
-#install CLUSTAL X
-#RUN wget http://www.clustal.org/download/current/clustalx-2.1.tar.gz && \
-
+#install fasta35 (needed for mafft)
+RUN wget https://faculty.virginia.edu/wrpearson/fasta/fasta33-35/fasta-35.4.12.tar.gz && \
+    tar -zxf fasta-35.4.12.tar.gz && \
+    cd fasta-35.4.12/src && \
+    make -f ../make/Makefile.linux_sse2 && \
+    cp ../bin/* /bin/. && \
+    rm /fasta-35.4.12.tar.gz
 
 # install MAFFT
 RUN wget http://mafft.cbrc.jp/alignment/software/mafft-7.397-with-extensions-src.tgz && \
@@ -126,6 +137,7 @@ RUN git clone https://github.com/edgano/tcoffee.git tcoffee && \
     make t_coffee && \
     cp t_coffee /bin/.
 
+ENV FASTA_4_MAFFT='/bin/fasta35'
 ENV CACHE_4_TCOFFEE='${TMPDIR:-/tmp}/.tcoffee/cache'
 ENV LOCKDIR_4_TCOFFEE='${TMPDIR:-/tmp}/.tcoffee/lock'
 ENV TMP_4_TCOFFEE='${TMPDIR:-/tmp}/.tcoffee/tmp'
