@@ -1,4 +1,4 @@
-export DUMP_ALN_BUCKETS=1
+#export DUMP_ALN_BUCKETS=1
 export NO_MAFFT_BINARIES=1
 
 replace_U.pl ${seqs} 
