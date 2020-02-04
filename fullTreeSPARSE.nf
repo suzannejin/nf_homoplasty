@@ -36,8 +36,8 @@
  */
 
 // input sequences to align in fasta format
-//params.seqs ="/users/cn/egarriga/datasets/homfam/combinedSeqs/seatoxin.fa"
-params.seqs ="/users/cn/egarriga/datasets/homfam/bigger1000/*.fa"
+params.seqs ="/users/cn/egarriga/datasets/homfam/combinedSeqs/seatoxin.fa"
+//params.seqs ="/users/cn/egarriga/datasets/homfam/bigger1000/*.fa"
 
 
 // input reference sequences aligned in 
@@ -76,7 +76,8 @@ params.evaluate = true
 params.buckets= '1000'
 
 // output directory
-params.output = "$baseDir/results_fullTree_SPARSE"
+params.output = "$baseDir/test_seatoxin_SPARSE_2"
+//params.output = "$baseDir/results_fullTree_SPARSE"
 
 
 log.info """\
@@ -220,8 +221,13 @@ process regressive_alignment {
         val("dpa_align"), \
         val(bucket_size), \
         file("*.aln"), \
+        file("*.homoplasy"), \
         file("*.homo"), \
-        file("*.w_homo") \
+        file("*.w_homo"), \
+        file("*.w_homo2"), \
+        file("*.len"), \
+        file("*.ngap"), \
+        file("*.ngap2") \
         into regressive_alignments
 
     when:

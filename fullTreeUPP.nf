@@ -76,6 +76,7 @@ params.evaluate = true
 params.buckets= '1000'
 
 // output directory
+//params.output = "$baseDir/test_seatoxin_UPP"
 params.output = "$baseDir/results_fullTree_UPP"
 
 
@@ -220,8 +221,13 @@ process regressive_alignment {
         val("dpa_align"), \
         val(bucket_size), \
         file("*.aln"), \
+        file("*.homoplasy"), \
         file("*.homo"), \
-        file("*.w_homo") \
+        file("*.w_homo"), \
+        file("*.w_homo2"), \
+        file("*.len"), \
+        file("*.ngap"), \
+        file("*.ngap2") \
         into regressive_alignments
 
     when:
