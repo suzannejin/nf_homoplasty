@@ -83,6 +83,7 @@ do
           fil=${f}/alignments/${i}.dpa_1000.${x}.with.${z}.tree.${typ}
           if [[ -s $fil ]]; then
             awk 'NR==1{printf $1" "}' ${fil}
+            [[ $typ == "ngap2" ]] && awk 'NR==1{printf $1" "}' ${fil} | tr -d "l"
           else
             printf "NA "
           fi
