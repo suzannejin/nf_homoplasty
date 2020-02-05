@@ -1,210 +1,153 @@
 # https://stackoverflow.com/questions/37756389/r-convert-multiple-columns-into-single-column
 
-#install.packages("data.table")
+
+## Libraries & packages
 library(data.table)
-
-setwd("~/Downloads")
-
-## import data
-#TOP20
-tc_homo_top20 <- read.csv(file="TOP20clustalo_TC.csv", header=TRUE, sep=",")
-hom_homo_top20 <- read.csv(file="TOP20clustalo_HOM.csv", header=TRUE, sep=",")
-gap_homo_top20 <- read.csv(file="TOP20clustalo_GAP.csv", header=TRUE, sep=",")
-
-#OVER1000
-tc_homo_over1000 <- read.csv(file="OVERclustalo_TC.csv", header=TRUE, sep=",")
-hom_homo_over1000 <- read.csv(file="OVERclustalo_HOM.csv", header=TRUE, sep=",")
-gap_homo_over1000 <- read.csv(file="OVERclustalo_GAP.csv", header=TRUE, sep=",")
-
-#ALL
-tc_homo_all <- read.csv(file="clustalo_TC.csv", header=TRUE, sep=",")
-hom_homo_all <- read.csv(file="clustalo_HOM.csv", header=TRUE, sep=",")
-gap_homo_all <- read.csv(file="clustalo_GAP.csv", header=TRUE, sep=",")
-
-####
-#### TOP20
-####
-
-## convert to 1 column dataframe
-setDT(tc_homo_top20)
-fullTC_top20=melt(tc_homo_top20, id = 1, value.name = "tc", variable.name = "tree")
-
-setDT(hom_homo_top20)
-fullHOM_top20=melt(hom_homo_top20, id = 1, value.name = "hom", variable.name = "tree")
-
-setDT(gap_homo_top20)
-fullGAP_top20=melt(gap_homo_top20, id = 1, value.name = "gap", variable.name = "tree")
-
-#combine both datasdts
-## https://stackoverflow.com/questions/6709151/how-do-i-combine-two-data-frames-based-on-two-columns
-tc_hom_top20 = merge(fullTC_top20, fullHOM_top20, by.x=c("family", "tree"), by.y=c("family", "tree"))
-total_top20 = merge(tc_hom_top20, fullGAP_top20, by.x=c("family", "tree"), by.y=c("family", "tree"))
-
-## analisys
-#install.packages("ggplot2")
 library(ggplot2)
-#install.packages("plotly")
 library(plotly)
+#library(gridExtra)
+library(ggpubr)
 
-p_tree_gap_top20 <- ggplot(data = total_top20, aes(x = gap, y = tc, color = tree)) +
-  geom_point() +
-  geom_smooth(method = "lm", fill = NA)+
-  geom_vline(xintercept = 0) + geom_hline(yintercept = 0)+
-  ggtitle("top20") +
-  xlab("Avg Gap") + ylab("") +
-  ylim(0,100)
 
-p_tree_hom_top20 <- ggplot(data = total_top20, aes(x = hom, y = tc, color = tree)) +
-  geom_point() +
-  geom_smooth(method = "lm", fill = NA)+
-  geom_vline(xintercept = 0) + geom_hline(yintercept = 0)+
-  ggtitle("top20") +
-  xlab("Homoplasty") + ylab("") +
-  ylim(0,100) +
-  theme(legend.position="none")
+setwd("~/homoplasy/data")
 
-ggplotly(p_tree_gap_top20)
-ggplotly(p_tree_hom_top20)
+metrics=c("tc","hom","w_hom","w_hom2","ngap","ngap2")
+files=c(paste(aligner,"_TC.csv",sep=""),
+        paste(aligner,"_HOM.csv",sep=""),
+        paste(aligner,"_W_HOM.csv",sep=""),
+        paste(aligner,"_W_HOM2.csv",sep=""),
+        paste(aligner,"_NGAP.csv",sep=""),
+        paste(aligner,"_NGAP2.csv",sep=""))
 
-####
-#### OVER1000
-####
+aligner="clustalo"
 
-## convert to 1 column dataframe
-setDT(tc_homo_over1000)
-fullTC_over1000=melt(tc_homo_over1000, id = 1, value.name = "tc", variable.name = "tree")
 
-setDT(hom_homo_over1000)
-fullHOM_over1000=melt(hom_homo_over1000, id = 1, value.name = "hom", variable.name = "tree")
 
-setDT(gap_homo_over1000)
-fullGAP_over1000=melt(gap_homo_over1000, id = 1, value.name = "gap", variable.name = "tree")
+## Import data
+import_data=function(aligner,metrics,files){
+    "
+    Input  -  aligner : name of the aligner (clustalo, )
+              metrics : vector with the name of the metrics (tc, hom, w_hom, w_hom2, ngap, ngap2)
+              files   : vector with the name of the .csv files to be imported
+    Output -  dataList: list of imported data 
+    "
+    dataList=list()
+    n=length(metrics)
+    for (i in 1:n){
+        metric=metrics[i]
+        fil=files[i]
+        dataList[[i]]=read.csv(file=fil,header=TRUE,sep=",")
+    }
+    names(dataList)=metrics
+    return(dataList)
+}
 
-#combine both datasdts
+
+
+## Convert to 1 column dataframe
+to1coldataList=function(dataList,metrics){
+    "
+    Input  - dataList   : list of imported data 
+             metrics    : vector with the name of the metrics (tc, hom, w_hom, w_hom2, ngap, ngap2)
+    Output - df1colList : list of 1 column dataframe
+    "
+    df1colList=list()
+    n=length(metrics)
+    for (i in 1:n){
+        data=dataList[[i]]
+        nam=metrics[i]
+        setDT(data)
+        df1colList[[i]]=melt(data, id = 1, value.name = nam, variable.name = "tree")
+    }
+    names(df1colList)=metrics
+    return(df1colList)
+}
+
+
+
+## Combine data
 ## https://stackoverflow.com/questions/6709151/how-do-i-combine-two-data-frames-based-on-two-columns
-tc_hom_over1000 = merge(fullTC_over1000, fullHOM_over1000, by.x=c("family", "tree"), by.y=c("family", "tree"))
-total_over1000 = merge(tc_hom_over1000, fullGAP_over1000, by.x=c("family", "tree"), by.y=c("family", "tree"))
+combine_datasets=function(df1colList){
+    n=length(df1colList)
+    mergedDf=merge(df1colList[[1]], df1colList[[2]], by.x=c("Family", "tree"), by.y=c("Family", "tree"))
+    for (i in 3:n){
+        mergedDf=merge(mergedDf, df1colList[[i]], by.x=c("Family", "tree"), by.y=c("Family", "tree"))
+    }
+    return(mergedDf)
+}
 
-## analisys
-#install.packages("ggplot2")
-#library(ggplot2)
-#install.packages("plotly")
-#library(plotly)
 
-p_tree_gap_over1000 <- ggplot(data = total_over1000, aes(x = gap, y = tc, color = tree)) +
-  geom_point() +
-  geom_smooth(method = "lm", fill = NA)+
-  geom_vline(xintercept = 0) + geom_hline(yintercept = 0)+
-  ggtitle("Over 1000") +
-  xlab("Avg Gap") + ylab("") +
-  ylim(0,100) +
-  theme(legend.position="none")
 
-p_tree_hom_over1000 <- ggplot(data = total_over1000, aes(x = hom, y = tc, color = tree)) +
-  geom_point() +
-  geom_smooth(method = "lm", fill = NA)+
-  geom_vline(xintercept = 0) + geom_hline(yintercept = 0)+
-  ggtitle("Over 1000") +
-  xlab("Homoplasy")+ ylab("") +
-  ylim(0,100) +
-  theme(legend.position="none")
+# Plot tc vs metrics
+gplot=function(df,xs){
+    plotList=list()
+    n=length(xs)
+    for (i in 1:n){
+        plotList[[i]]=ggplot(df,aes_string(x=xs[i],y="tc",color="tree")) +
+            geom_point() +
+            geom_smooth(method = "lm", fill = NA)+
+            geom_vline(xintercept = 0) + geom_hline(yintercept = 0)+
+            ggtitle("ALL") +
+            xlab(xs[i]) + ylab("") +
+            ylim(0,100)
+    }
+    names(plotList)=xs
+    return(plotList)
+}
 
-ggplotly(p_tree_gap_over1000)
-ggplotly(p_tree_hom_over1000)
 
-####
-#### ALL
-####
+get_delta=function(df,metrics){
+    trees=df$tree;fams=df$Family
+    ntree=length(trees);nfam=length(fams)
+    nmetrics=length(metrics)
+    deltaArray=array(0,dim=c(ntree,ntree,nmetrics,nfam),dimnames=list(trees,trees,metrics,fams))
 
-## convert to 1 column dataframe
-setDT(tc_homo_all)
-fullTC_all=melt(tc_homo_all, id = 1, value.name = "tc", variable.name = "tree")
+    for (f in 1:nfam)
+        for (m in 1:nmetrics){
+            for (i in 1:ntree){
+                for (j in 1:ntree){
+                    tree1=trees[i];tree2=trees[j];metric=metrics[m];fam=fams[f]
+                    df2=df[which(df$Family==fam),]
+                    value1=as.numeric(df2[which(df2$tree==tree1),])[m]
+                    value2=as.numeric(df2[which(df2$tree==tree2),])[m]
+                    delta=value1-value2
+                    deltaArray[i,j,m,f]=delta
+                }
+            }
+        }
+    }
+    return(deltaArray)
+}
 
-setDT(hom_homo_all)
-fullHOM_all=melt(hom_homo_all, id = 1, value.name = "hom", variable.name = "tree")
 
-setDT(gap_homo_all)
-fullGAP_all=melt(gap_homo_all, id = 1, value.name = "gap", variable.name = "tree")
 
-#combine both datasdts
-## https://stackoverflow.com/questions/6709151/how-do-i-combine-two-data-frames-based-on-two-columns
-tc_hom_all = merge(fullTC_all, fullHOM_all, by.x=c("family", "tree"), by.y=c("family", "tree"))
-total_all = merge(tc_hom_all, fullGAP_all, by.x=c("family", "tree"), by.y=c("family", "tree"))
+# Run
+dataList=import_data(aligner,metrics,files)
+df1colList=to1coldataList(dataList,metrics)
+mergedDf=combine_datasets(df1colList)
 
-## analisys
-#install.packages("ggplot2")
-#library(ggplot2)
-#install.packages("plotly")
-#library(plotly)
 
-p_tree_gap_all <- ggplot(data = total_all, aes(x = gap, y = tc, color = tree)) +
-  geom_point() +
-  geom_smooth(method = "lm", fill = NA)+
-  geom_vline(xintercept = 0) + geom_hline(yintercept = 0)+
-  ggtitle("full dataset") +
-  xlab("Avg Gap")+ ylab("") +
-  ylim(0,100) +
-  theme(legend.position="none")
 
-p_tree_hom_all <- ggplot(data = total_all, aes(x = hom, y = tc, color = tree)) +
-  geom_point() +
-  geom_smooth(method = "lm", fill = NA)+
-  geom_vline(xintercept = 0) + geom_hline(yintercept = 0)+
-  ggtitle("full dataset") +
-  xlab("Homoplasy")+ ylab("") +
-  ylim(0,100) +
-  theme(legend.position="none")
 
-ggplotly(p_tree_gap_all)
-ggplotly(p_tree_hom_all)
+df=mergedDf
+plotList=gplot(df,metrics[2:6])
+
+
+## Here you can explore the plots by:
+#plotList$ngap
+#ggplotly(plotList$ngap)
+
+
+
 
 #######
 ### GRID WITH ALL PLOTS
 #######
-#install.packages("gridExtra")
-#library(gridExtra)
 
-get_legend<-function(myggplot){
-  tmp <- ggplot_gtable(ggplot_build(myggplot))
-  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
-  legend <- tmp$grobs[[leg]]
-  return(legend)
-}
-
-legend <- get_legend(p_tree_gap_top20)
-p_tree_gap_top20 <- p_tree_gap_top20 + theme(legend.position="none")
-
-#grid.arrange(p_tree_gap_top20, p_tree_hom_top20,p_tree_gap_over1000, p_tree_hom_over1000,p_tree_gap_all, p_tree_hom_all,legend, nrow = 3)
-
-
-#install.packages("ggpubr")
-library(ggpubr)
-
-figure <-ggarrange(p_tree_gap_top20, p_tree_hom_top20,p_tree_gap_over1000, p_tree_hom_over1000,p_tree_gap_all, p_tree_hom_all, ncol=2, nrow=3, common.legend = TRUE, legend="bottom")
-
+figure=ggarrange(plotList$ngap,plotList$ngap2,plotList$hom,plotList$w_hom,plotList$w_hom2,common.legend=TRUE)
 
 annotate_figure(figure,
-                top = text_grob("Alignment with CO", size = 14),
+                top = text_grob(paste("Alignment with ",toupper(aligner),sep=""), size = 14),
                 left = text_grob("TC Score", rot = 90)
 )
-
-####################################################
-#remove RND trees
-mBed_famsa =subset(total, delta=="mBed.FAMSA")
-mBed_pt =subset(total,  delta=="mBed.PartTree" )
-pt_famsa =subset(total, delta=="PartTree.FAMSA")
-homoplasy_nonRND = rbind(mBed_famsa, mBed_pt, pt_famsa)
-
-## count how many points in each sector
-
-## upp - left
-length(which(homoplasy_nonRND$hom<0 & homoplasy_nonRND$tc>0))
-## upp - right
-length(which(homoplasy_nonRND$hom>0 & homoplasy_nonRND$tc>0))
-## down - left
-length(which(homoplasy_nonRND$hom<0 & homoplasy_nonRND$tc<0))
-## down - right
-length(which(homoplasy_nonRND$hom>0 & homoplasy_nonRND$tc<0))
-
-
 
