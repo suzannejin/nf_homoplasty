@@ -14,36 +14,46 @@ declare -a tcs=(tc sp col)
 declare -a homos=(homo w_homo w_homo2 len ngap ngap2)
 
 
-printf "family aligner tree tc sp col homo w_homo w_homo2 len ngap ngap2\n"
+printf "family aligner tree1 tree2 tc sp col homo w_homo w_homo2 len ngap ngap2\n"
 
 for fam in ${familyName[@]}; do
     i=0
     for aln in ${aligner[@]}; do
         fold=${folders[$i]}
-        for tr in ${tree[@]}; do
-            printf "$fam $aln $tr "
+        #ntr=0
+        for tr1 in ${tree[@]}; do
+        #ntr=$((ntr+1))
+        for tr2 in ${tree[@]}; do
+            [[ $tr1 == $tr2 ]] && continue
+            printf "$fam $aln $tr1 $tr2 "
             for tc in ${tcs[@]}; do
-                fil=${fold}/individual_scores/${fam}.dpa_align.1000.${aln}.${tr}.${tc}
-                if [[ -s $fil ]]; then
-                    awk 'NR==1{printf $1" "}' ${fil}
+                fil1=${fold}/individual_scores/${fam}.dpa_align.1000.${aln}.${tr1}.${tc}
+                fil2=${fold}/individual_scores/${fam}.dpa_align.1000.${aln}.${tr2}.${tc}
+                if [[ -s $fil1 && -s $fil2 ]]; then
+                    val1=$(awk 'NR==1{printf $1" "}' ${fil1})
+                    val2=$(awk 'NR==1{printf $1" "}' ${fil2})
+                    python -c "print $val1 - $val2" | tr "\n" " "
                 else
                     printf "NA "
                 fi
             done
             for hom in ${homos[@]}; do
-                fil=${fold}/alignments/${fam}.dpa_1000.${aln}.with.${tr}.tree.${hom}
-                if [[ -s $fil ]]; then
+                fil1=${fold}/alignments/${fam}.dpa_1000.${aln}.with.${tr1}.tree.${hom}
+                fil2=${fold}/alignments/${fam}.dpa_1000.${aln}.with.${tr2}.tree.${hom}
+                if [[ -s $fil1 && -s $fil2 ]]; then
+                    val1=$(awk 'NR==1{printf $1" "}' ${fil1} | tr -d "l")
+                    val2=$(awk 'NR==1{printf $1" "}' ${fil2} | tr -d "l")
                     if [[ $hom == "ngap2" ]]; then 
-                        awk 'NR==1{printf $1"\n"}' ${fil} | tr -d "l"
+                        python -c "print $val1 - $val2" 
                     else
-                        awk 'NR==1{printf $1" "}' ${fil}
+                        python -c "print $val1 - $val2" | tr "\n" " "
                     fi
                 else
                     printf "NA "
                 fi
             done
         done
+        done
         i=$((i+1))
     done
 done
-

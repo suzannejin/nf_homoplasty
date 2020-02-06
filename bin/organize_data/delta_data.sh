@@ -42,12 +42,15 @@ for fam in ${familyName[@]}; do
                 if [[ -s $fil1 && -s $fil2 ]]; then
                     val1=$(awk 'NR==1{printf $1" "}' ${fil1} | tr -d "l")
                     val2=$(awk 'NR==1{printf $1" "}' ${fil2} | tr -d "l")
-                    python -c "print $val1 - $val2" | tr "\n" " "
+                    if [[ $hom == "ngap2" ]]; then 
+                        python -c "print $val1 - $val2" 
+                    else
+                        python -c "print $val1 - $val2" | tr "\n" " "
+                    fi
                 else
                     printf "NA "
                 fi
             done
-            printf "\n"
         done
         done
         i=$((i+1))
