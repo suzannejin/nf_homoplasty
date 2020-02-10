@@ -21,6 +21,24 @@ fil$tree=paste(fil$tree1,fil$tree2,sep="_")
 
 
 
+# Remove guide trees
+rm_tree=function(df,treename)
+{
+    pos=c(which(df$tree1==treename))
+    pos=c(pos,which(df$tree2==treename))
+    df2=df[-pos,]
+    return(df2)
+}
+
+to_be_rm=c("parttreednd2","parttreednd2size")
+for (tr in to_be_rm)
+{
+    fil=rm_tree(fil,tr)
+}
+
+
+
+
 # Plot function : tc vs metric
 gplot_tc_metric=function(df,xs,color,shape,title){
     plotList=list()
@@ -47,7 +65,7 @@ annotate_figure(figure,
                 top = text_grob(paste("All delta together",sep=""), size = 14),
                 left = text_grob("TC Score", rot = 90)
 )
-ggsave("/users/cn/sjin/projects/homoplasy/nf_homoplasty/plots/tc_metric.grid.allfam.allaligner.png") 
+ggsave("/users/cn/sjin/projects/homoplasy/nf_homoplasty/plots/plots_12trees_above1000/tc_metric.grid.above1000.3aligner.12tree.png") 
 
 
 
@@ -61,7 +79,7 @@ for (fam in fams){
                 top = text_grob(paste("Family: ",fam,sep=""), size = 14),
                 left = text_grob("TC Score", rot = 90)
     )
-    out=paste("/users/cn/sjin/projects/homoplasy/nf_homoplasty/plots/tc_metric.grid.",fam,".allaligner.png",sep="")
+    out=paste("/users/cn/sjin/projects/homoplasy/nf_homoplasty/plots/plots_12trees_above1000/tc_metric.grid.",fam,".3aligner.12tree.png",sep="")
     ggsave(out) 
 }
 
@@ -79,7 +97,7 @@ for (fam in fams){
                     top = text_grob(paste("Family: ",fam,sep=""), size = 14),
                     left = text_grob("TC Score", rot = 90)
         )
-        out=paste("/users/cn/sjin/projects/homoplasy/nf_homoplasty/plots/tc_metric.grid.",fam,".",aln,".png",sep="")
+        out=paste("/users/cn/sjin/projects/homoplasy/nf_homoplasty/plots/plots_12trees_above1000/tc_metric.grid.",fam,".",aln,"12tree.png",sep="")
         ggsave(out) 
     }
 }

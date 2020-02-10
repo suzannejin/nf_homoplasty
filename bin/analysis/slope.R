@@ -11,6 +11,27 @@ fil=read.csv("delta_data.csv",header=TRUE,sep=" ",row.names=NULL)
 fil$tree=paste(fil$tree1,fil$tree2,sep="_")
 
 
+
+
+# Remove guide trees
+rm_tree=function(df,treename)
+{
+    pos=c(which(df$tree1==treename))
+    pos=c(pos,which(df$tree2==treename))
+    df2=df[-pos,]
+    return(df2)
+}
+
+to_be_rm=c("parttreednd2","parttreednd2size")
+for (tr in to_be_rm)
+{
+    fil=rm_tree(fil,tr)
+}
+
+
+
+
+# Slope function
 get_slope_interc=function(df,metric)
 {
     slop=lm(df$tc ~ get(metric,df),na.action=na.exclude)$coefficients[2]
