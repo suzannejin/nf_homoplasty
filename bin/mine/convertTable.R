@@ -1,6 +1,6 @@
 # https://stackoverflow.com/questions/37756389/r-convert-multiple-columns-into-single-column
 
-
+  
 ## Libraries & packages
 #install.packages("data.table")
 library(data.table)
