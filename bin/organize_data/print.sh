@@ -23,17 +23,17 @@ print_tc () {
   printf "\t\t######### $TYP ###########\n"
   printf "\t\t########################\n"
 
-  printf "Family "
+  printf "Family\t"
 
   for z in ${tree[@]} 
   do 
-    printf ${z}" "
+    printf ${z}"\t"
   done
   printf "\n"
 
   for i in ${familyName[@]}
   do
-    printf "${i} "
+    printf "${i}\t"
           
           for x in ${aligner[@]}
       do
@@ -41,9 +41,9 @@ print_tc () {
           do
             fil=${f}/individual_scores/${i}.dpa_align.1000.${x}.${z}.${typ}
             if [[ -s $fil ]]; then
-              awk 'NR==1{printf $1" "}' ${fil}
+              awk 'NR==1{printf $1"\t"}' ${fil}
             else
-              printf "NA "
+              printf "NA\t"
             fi
           done
       done
@@ -51,7 +51,6 @@ print_tc () {
   done
 
 }
-
 
 print_homo () {
 
@@ -62,34 +61,34 @@ printf "\t\t########################\n"
 printf "\t\t######### $TYP ###########\n"
 printf "\t\t########################\n"
 
-printf "Family "
+printf "Family\t"
 
 for z in ${tree[@]} 
 do 
-  printf ${z}" "
+  printf ${z}"\t"
 done
 printf "\n"
 
 for i in ${familyName[@]}
 do
-  printf "${i} "
+  printf "${i}\t"
   
   for x in ${aligner[@]}
-    do
-        for z in ${tree[@]}
-        do
-          fil=${f}/alignments/${i}.dpa_1000.${x}.with.${z}.tree.${typ}
-          if [[ -s $fil ]]; then
-            if [[ $typ == "ngap2" ]]; then 
-              awk 'NR==1{printf $1" "}' ${fil} | tr -d "l"
-            else
-              awk 'NR==1{printf $1" "}' ${fil}
-            fi
+  do
+      for z in ${tree[@]}
+      do
+        fil=${f}/alignments/${i}.dpa_1000.${x}.with.${z}.tree.${typ}
+        if [[ -s $fil ]]; then
+          if [[ $typ == "ngap2" ]]; then 
+            awk 'NR==1{printf $1"\t"}' ${fil} | tr -d "l"
           else
-            printf "NA "
+            awk 'NR==1{printf $1"\t"}' ${fil}
           fi
-        done
-    done
+        else
+          printf "NA\t"
+        fi
+      done
+  done
   printf "\n"
 done
 
