@@ -64,13 +64,12 @@ params.tree_method = "CLUSTALO"
 params.regressive_align = true
 
 // create standard alignments ?
-params.standard_align = false
-
-// create default alignments ? 
-params.default_align = false
+params.progressive_align = false
 
 // evaluate alignments ?
 params.evaluate = true
+
+params.homoplasy = false
 
 // bucket sizes for regressive algorithm
 params.buckets= '1000,2000,5000,10000,12500,15000,20000,25000,30000'
@@ -85,33 +84,30 @@ log.info """\
          Input sequences (FASTA)                        : ${params.seqs}
          Input references (Aligned FASTA)               : ${params.refs}
          Input trees (NEWICK)                           : ${params.trees}
-         Output directory (DIRECTORY)                   : ${params.output}
-         Alignment methods                              : ${params.align_method}
-         Tree methods                                   : ${params.tree_method}
-         Generate default alignments                    : ${params.default_align}
-         Generate standard alignments                   : ${params.standard_align}
+         Alignment methods                              : ${align_method}
+         Tree methods                                   : ${tree_method}
+         Generate progressive alignments                : ${params.progressive_align}
          Generate regressive alignments (DPA)           : ${params.regressive_align}
          Bucket Sizes for regressive alignments         : ${params.buckets}
          Perform evaluation? Requires reference         : ${params.evaluate}
+         Capture Homoplasy metrics?                     : ${params.homoplasy}
          Output directory (DIRECTORY)                   : ${params.output}
          """
          .stripIndent()
-
 
 // Channels containing sequences
 if ( params.seqs ) {
   Channel
   .fromPath(params.seqs)
   .map { item -> [ item.baseName, item] }
-  .into { seqs; seqs2; seqs3 }
+  .into { seqsCh; seqs2 }
 }
 
-// Channels containing reference alignments for evaluation [OPTIONAL]
-if( params.refs ) {
+if ( params.refs ) {
   Channel
-    .fromPath(params.refs)
-    .map { item -> [ item.baseName, item] }
-    .set { refs }
+  .fromPath(params.refs)
+  .map { item -> [ item.baseName, item] }
+  .set { refs }
 }
 
 // Channels for user provided trees or empty channel if trees are to be generated [OPTIONAL]
@@ -127,10 +123,6 @@ else {
     .set { trees }
 }
 
-tree_methods = params.tree_method
-align_methods = params.align_method
-
-
 /*
  * GENERATE GUIDE TREES USING MEHTODS DEFINED WITH "--tree_method"
  *
@@ -138,17 +130,14 @@ align_methods = params.align_method
  * BY USING THE `--trees` PARAMETER
  */
 
-process guide_trees {
-
+process generate_trees {
     tag "${id}.${tree_method}"
     publishDir "${params.output}/guide_trees", mode: 'copy', overwrite: true
    
     input:
-
-     set val(id), \
+    set val(id), \
          file(seqs) \
-         from seqs
-     each tree_method from tree_methods.tokenize(',') 
+         from seqsCh
 
    output:
      set val(id), \
@@ -160,114 +149,131 @@ process guide_trees {
      !params.trees
 
    script:
-     template "tree/generate_tree_${tree_method}.sh"
+   """
+    template "tree/generate_tree_${tree_method}.sh"
+   """
 }
-
 
 treesGenerated
   .mix ( trees )
   .combine ( seqs2, by:0 )
-  .into { seqsAndTreesForStandardAlignment; seqsAndTreesForRegressiveAlignment }
-
-process standard_alignment {
-  
-    tag "${id}.${align_method}.STD.NA.${tree_method}"
-    publishDir "${params.output}/alignments", mode: 'copy', overwrite: true
-    
-    input:
-      set val(id), \
-        val(tree_method), \
-        file(guide_tree), \
-        file(seqs) \
-        from seqsAndTreesForStandardAlignment
-
-      each align_method from align_methods.tokenize(',') 
-
-    when:
-      params.standard_align
-
-    output:
-      set val(id), \
-      val("${align_method}"), \
-      val(tree_method), val("std_align"), \
-      val("NA"), file("${id}.std.${align_method}.with.${tree_method}.tree.aln") \
-      into standard_alignments
-
-     script:
-       template "std_align/std_align_${align_method}.sh"
-}
+  .into {seqsAndTreesForRegressiveAlignment; seqsAndTreesForProgressiveAlignment }
 
 process regressive_alignment {
-
-    tag "${id}.${align_method}.DPA.${bucket_size}.${tree_method}"
-    publishDir "${params.output}/alignments", mode: 'copy', overwrite: true
+    tag "${id}"
+    publishDir "${params.output}/alignments", pattern: '*.aln', mode: 'copy', overwrite: true
 
     input:
-      set val(id), \
+        set val(id), \
         val(tree_method), \
         file(guide_tree), \
         file(seqs) \
         from seqsAndTreesForRegressiveAlignment
 
       each bucket_size from params.buckets.tokenize(',')
-       
       each align_method from align_methods.tokenize(',')   
+
+    when:
+      params.regressive_align
 
     output:
       set val(id), \
         val("${align_method}"), \
         val(tree_method), \
-        val("dpa_align"), \
+        val("reg_align"), \
         val(bucket_size), \
-        file("*.aln"), \
-        file("*.homo"), \
-        file("*.w_homo") \
-        into regressive_alignments
+        file("${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.aln") \
+        into regressiveOut
 
-    when:
-      params.regressive_align
+      set val(id), \
+        val("${align_method}"), \
+        val(tree_method), \
+        val(bucket_size), \ 
+        file("${id}.homoplasy") optional true \
+        into homoReg
 
     script:
-       template "dpa_align/dpa_align_${align_method}.sh"
+       template "reg_align/reg_align_${align_method}.sh"
 }
 
-process default_alignment {
+process homoplasy{
+    tag "${id}"
+    publishDir "${params.output}/homoplasy", mode: 'copy', overwrite: true
 
-    tag "${id}.${align_method}.DEFAULT.NA.${align_method}"
+    input:
+    set val(id), \
+      val("${align_method}"), \
+      val(tree_method), \
+      val(bucket_size), \ 
+      file(homoplasy) \
+      from homoReg
+
+    when:
+      params.homoplasy
+
+    output:
+    set file("${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.homo"), \
+        file("${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.w_homo"), \
+        file("${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.w_homo2"), \
+        file("${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.len"), \
+        file("${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.ngap"), \
+        file("${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.ngap2") \
+        optional true into homoplasyOut
+
+    script:
+    """    
+      ## homo
+      awk 'NR == 1 {print \$2}' ${id}.homoplasy > ${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.homo
+      ## w_homo
+      awk 'NR == 2 {print \$2}' ${id}.homoplasy > ${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.w_homo
+      ## w_homo2
+      awk 'NR == 3 {print \$2}' ${id}.homoplasy > ${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.w_homo2
+      ## len
+      awk 'NR == 4 {print \$2}' ${id}.homoplasy > ${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.len
+      ## ngap
+      awk 'NR == 5 {print \$2}' ${id}.homoplasy > ${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.ngap
+      ## ngap2
+      awk 'NR == 6 {print \$2}' ${id}.homoplasy > ${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.ngap2 
+    """
+}
+
+process progressive_alignment {
+    tag "${id}"
     publishDir "${params.output}/alignments", mode: 'copy', overwrite: true
 
     input:
-      set val(id), file(seqs) from seqs3
-      each align_method from align_methods.tokenize(',') 
+        set val(id), \
+        val(tree_method), \
+        file(guide_tree), \
+        file(seqs) \
+        from seqsAndTreesForProgressiveAlignment
 
     when:
-      params.default_align
+      params.progressive_align
 
     output:
       set val(id), \
-      val("${align_method}"), \
-      val("DEFAULT"), val("default_align"), \
-      val("NA"), file("${id}.default.${align_method}.aln") \
-      into default_alignments
+        val("${align_method}"), \
+        val(tree_method), \
+        val("prog_align"), \
+        val("NA"), \
+        file("${id}.prog_align.NA.${align_method}.with.${tree_method}.tree.aln") \
+        into progressiveOut
 
-     script:
-       template "default_align/default_align_${align_method}.sh"
+    script:
+      template "prog_align/prog_align_${align_method}.sh"
 }
 
-// Create a channel that combines references and alignments to be evaluated
-standard_alignments
-  .mix ( regressive_alignments )
-  .mix ( default_alignments )
+progressiveOut
+  .mix ( regressiveOut )
   .set { all_alignments }
 
 refs
-  .cross ( all_alignments )
+  .cross (all_alignments )
   .map { it -> [it[0][0], it[1][1], it[1][2], it[1][3], it[1][4], it[1][5], it[0][1]] }
   .set { toEvaluate }
 
-
-process eval {
-    
+process evaluation {
     tag "${id}.${align_method}.${tree_method}.${align_type}.${bucket_size}"
     publishDir "${params.output}/individual_scores", mode: 'copy', overwrite: true
 
@@ -297,36 +303,33 @@ process eval {
 
      script:
      """
-       ## Sum-of-Pairs Score ##
        t_coffee -other_pg aln_compare \
              -al1 ${ref_alignment} \
              -al2 ${test_alignment} \
             -compare_mode sp \
             | grep -v "seq1" | grep -v '*' | \
             awk '{ print \$4}' ORS="\t" \
-            > "${id}.${align_type}.${bucket_size}.${align_method}.${tree_method}.sp"
-       
-       ## Total Column Score ## 
+            > "${id}.${align_type}.${bucket_size}.${align_method}.with.${tree_method}.tree.sp"
+
        t_coffee -other_pg aln_compare \
              -al1 ${ref_alignment} \
              -al2 ${test_alignment} \
             -compare_mode tc \
             | grep -v "seq1" | grep -v '*' | \
             awk '{ print \$4}' ORS="\t" \
-            > "${id}.${align_type}.${bucket_size}.${align_method}.${tree_method}.tc"
+            > "${id}.${align_type}.${bucket_size}.${align_method}.with.${tree_method}.tree.tc"
 
-       ## Column Score ##
        t_coffee -other_pg aln_compare \
              -al1 ${ref_alignment} \
              -al2 ${test_alignment} \
             -compare_mode column \
             | grep -v "seq1" | grep -v '*' | \
               awk '{ print \$4}' ORS="\t" \
-            > "${id}.${align_type}.${bucket_size}.${align_method}.${tree_method}.col"
+            > "${id}.${align_type}.${bucket_size}.${align_method}.with.${tree_method}.tree.col"
 
     """
 }
 
 workflow.onComplete {
-  println "Execution status: ${ workflow.success ? 'OK' : 'failed' } runName: ${workflow.runName}" 
+  println "Execution status: ${ workflow.success ? 'OK' : 'failed' } runName: ${workflow.runName}"
 }
