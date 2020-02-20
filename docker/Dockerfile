@@ -148,7 +148,8 @@ RUN git clone https://github.com/edgano/tcoffee.git tcoffee && \
     cp t_coffee /bin/.
 
 ENV FASTA_4_MAFFT='/bin/fasta35'
+
 ENV CACHE_4_TCOFFEE='${TMPDIR:-/tmp}/.tcoffee/cache'
 ENV LOCKDIR_4_TCOFFEE='${TMPDIR:-/tmp}/.tcoffee/lock'
 ENV TMP_4_TCOFFEE='${TMPDIR:-/tmp}/.tcoffee/tmp'
-
+ENV HOME_4_TCOFFEE='${TMPDIR:-/tmp}/.tcoffee/'
