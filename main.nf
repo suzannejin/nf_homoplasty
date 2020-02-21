@@ -1,30 +1,26 @@
 #!/usr/bin/env nextflow
 
-// nextflow run fullTreeCO.nf -with-singularity
-// fullTreeCO.nf , fullTreeFFTNS1.nf, fullTreeSPARSE.nf, fullTreeUPP.nf, fullTreeGINSI.nf
-
-
 /*
  * Copyright (c) 2017-2018, Centre for Genomic Regulation (CRG) and the authors.
  *
- *   This file is part of 'regressive-msa-analysis'.
+ *   This file is part of 'homoplasy-analysis'.
  *
- *   regressive-msa--analysis is free software: you can redistribute it and/or modify
+ *   homoplasy-analysis is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
  *   the Free Software Foundation, either version 3 of the License, or
  *   (at your option) any later version.
  *
- *   regressive-msa-analysis is distributed in the hope that it will be useful,
+ *   homoplasy-analysis is distributed in the hope that it will be useful,
  *   but WITHOUT ANY WARRANTY; without even the implied warranty of
  *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with regressive-msa-analysis.  If not, see <http://www.gnu.org/licenses/>.
+ *   along with homoplasy-analysis.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 /* 
- * Main regressive-msa-analysis pipeline script
+ * Main homoplasy-analysis pipeline script
  *
  * @authors
  * Edgar Garriga
@@ -37,61 +33,56 @@
 
 // input sequences to align in fasta format
 params.seqs ="/users/cn/egarriga/datasets/homfam/combinedSeqs/seatoxin.fa"
-//params.seqs ="/users/cn/egarriga/datasets/homfam/bigger1000/*.fa"
+//params.seqs ="${baseDir}/test/*.fa"
 
-
-// input reference sequences aligned in 
-params.refs = "/users/cn/egarriga/datasets/homfam/refs/*"
-
+// input reference sequences aligned in
+params.refs = "/users/cn/egarriga/datasets/homfam/refs/*.ref"
+//params.refs ="${baseDir}/test/*.ref"
 
 // input guide trees in Newick format. Or `false` to generate trees
-params.trees ="/users/cn/egarriga/datasets/homfam/trees/*.FAMSA.dnd"
+//params.trees ="/home/edgar/CBCRG/nf_homoplasty/results_trees"
 
-params.trees ="/users/cn/egarriga/nf_homoplasy/results_tree/guide_trees/*.{codnd,dpparttreednd1,dpparttreednd2,dpparttreednd2size,fastaparttreednd,fftns1dnd,fftns1dndmem,fftns2dnd,fftns2dndmem,mafftdnd,parttreednd0,parttreednd1,parttreednd2,parttreednd2size}.dnd"
-
-
-// params.trees = false
-
+// which tree methods to run if `trees` == `false`
+params.tree_method = "dpparttreednd1,fastaparttreednd"
+//codnd,dpparttreednd1,dpparttreednd2,dpparttreednd2size,fastaparttreednd,fftns1dnd,fftns1dndmem,fftns2dnd,fftns2dndmem,mafftdnd,parttreednd0,parttreednd1,parttreednd2,parttreednd2size
 
 // which alignment methods to run
 params.align_method = "FAMSA" //CLUSTALO,MAFFT-FFTNS1,MAFFT-SPARSECORE,UPP,MAFFT-GINSI"
-
-
-// which tree methods to run if `trees` == `false`
-params.tree_method = "CLUSTALO" 
 
 // generate regressive alignments ?
 params.regressive_align = true
 
 // create standard alignments ?
-params.progressive_align = false
+params.progressive_align = true
 
 // evaluate alignments ?
 params.evaluate = true
 
-params.homoplasy = false
+params.homoplasy = true
+
+params.metrics = false
 
 // bucket sizes for regressive algorithm
-params.buckets= '1000,2000,5000,10000,12500,15000,20000,25000,30000'
+params.buckets= '1000'
 
 // output directory
-params.output = "$baseDir/results_multiFAMSA"
-
+params.outdir = "$baseDir/results"
 
 log.info """\
-         R E G R E S S I V E   H O M O P L A S Y   A n a l y s i s  ~  version 0.1"
+         H O M O P L A S Y   A n a l y s i s  ~  version 0.1"
          ======================================="
          Input sequences (FASTA)                        : ${params.seqs}
          Input references (Aligned FASTA)               : ${params.refs}
          Input trees (NEWICK)                           : ${params.trees}
-         Alignment methods                              : ${align_method}
-         Tree methods                                   : ${tree_method}
+         Alignment methods                              : ${params.align_method}
+         Tree methods                                   : ${params.tree_method}
          Generate progressive alignments                : ${params.progressive_align}
          Generate regressive alignments (DPA)           : ${params.regressive_align}
          Bucket Sizes for regressive alignments         : ${params.buckets}
          Perform evaluation? Requires reference         : ${params.evaluate}
          Capture Homoplasy metrics?                     : ${params.homoplasy}
-         Output directory (DIRECTORY)                   : ${params.output}
+         Capture runtime metrics?                       : ${params.metrics}
+         Output directory (DIRECTORY)                   : ${params.outdir}
          """
          .stripIndent()
 
@@ -123,6 +114,9 @@ else {
     .set { trees }
 }
 
+tree_methods = params.tree_method
+align_methods = params.align_method
+
 /*
  * GENERATE GUIDE TREES USING MEHTODS DEFINED WITH "--tree_method"
  *
@@ -132,12 +126,13 @@ else {
 
 process generate_trees {
     tag "${id}.${tree_method}"
-    publishDir "${params.output}/guide_trees", mode: 'copy', overwrite: true
+    publishDir "${params.outdir}/guide_trees", mode: 'copy', overwrite: true
    
     input:
     set val(id), \
          file(seqs) \
          from seqsCh
+    each tree_method from tree_methods.tokenize(',') 
 
    output:
      set val(id), \
@@ -149,9 +144,8 @@ process generate_trees {
      !params.trees
 
    script:
-   """
     template "tree/generate_tree_${tree_method}.sh"
-   """
+
 }
 
 treesGenerated
@@ -160,8 +154,8 @@ treesGenerated
   .into {seqsAndTreesForRegressiveAlignment; seqsAndTreesForProgressiveAlignment }
 
 process regressive_alignment {
-    tag "${id}"
-    publishDir "${params.output}/alignments", pattern: '*.aln', mode: 'copy', overwrite: true
+    tag "${id}-${align_method}-${bucket_size}-${tree_method}"
+    publishDir "${params.outdir}/alignments", pattern: '*.aln', mode: 'copy', overwrite: true
 
     input:
         set val(id), \
@@ -188,9 +182,19 @@ process regressive_alignment {
       set val(id), \
         val("${align_method}"), \
         val(tree_method), \
-        val(bucket_size), \ 
-        file("${id}.homoplasy") optional true \
+        val(bucket_size), \
+        file("${id}.homoplasy") \
         into homoReg
+
+      /**
+      set val(id), \
+        val("${align_method}"), \
+        val(tree_method), \
+        val(bucket_size), \
+        val("reg_align"), \
+        val("$PWD") \
+        into metricsReg
+      **/
 
     script:
        template "reg_align/reg_align_${align_method}.sh"
@@ -198,13 +202,13 @@ process regressive_alignment {
 
 process homoplasy{
     tag "${id}"
-    publishDir "${params.output}/homoplasy", mode: 'copy', overwrite: true
+    publishDir "${params.outdir}/homoplasy", mode: 'copy', overwrite: true
 
     input:
     set val(id), \
-      val("${align_method}"), \
+      val(align_method), \
       val(tree_method), \
-      val(bucket_size), \ 
+      val(bucket_size), \
       file(homoplasy) \
       from homoReg
 
@@ -212,34 +216,82 @@ process homoplasy{
       params.homoplasy
 
     output:
-    set file("${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.homo"), \
-        file("${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.w_homo"), \
-        file("${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.w_homo2"), \
-        file("${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.len"), \
-        file("${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.ngap"), \
-        file("${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.ngap2") \
-        optional true into homoplasyOut
+    set file("*.homo"), \
+        file("*.w_homo"), \
+        file("*.w_homo2"), \
+        file("*.len"), \
+        file("*.ngap"), \
+        file("*.ngap2") \
+        into homoplasyOut
 
     script:
     """    
-      ## homo
-      awk 'NR == 1 {print \$2}' ${id}.homoplasy > ${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.homo
-      ## w_homo
-      awk 'NR == 2 {print \$2}' ${id}.homoplasy > ${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.w_homo
-      ## w_homo2
-      awk 'NR == 3 {print \$2}' ${id}.homoplasy > ${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.w_homo2
-      ## len
-      awk 'NR == 4 {print \$2}' ${id}.homoplasy > ${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.len
-      ## ngap
-      awk 'NR == 5 {print \$2}' ${id}.homoplasy > ${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.ngap
-      ## ngap2
-      awk 'NR == 6 {print \$2}' ${id}.homoplasy > ${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.ngap2 
+    ## homo
+    awk -F : '{ if (\$1=="HOMOPLASY") print \$2}' ${homoplasy} > ${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.homo
+    ## w_homo
+    awk -F : '{ if (\$1=="WEIGHTED_HOMOPLASY") print \$2}' ${id}.homoplasy > ${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.w_homo
+    ## w_homo2
+    awk -F : '{ if (\$1=="WEIGHTED_HOMOPLASY2") print \$2}' ${id}.homoplasy > ${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.w_homo2
+    ## len
+    awk -F : '{ if (\$1=="LEN") print \$2}' ${id}.homoplasy > ${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.len
+    ## ngap
+    awk -F : '{ if (\$1=="NGAP") print \$2}' ${id}.homoplasy > ${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.ngap
+    ## ngap2
+    awk -F : '{ if (\$1=="NGAP2") print \$2}' ${id}.homoplasy > ${id}.reg_align.${bucket_size}.${align_method}.with.${tree_method}.tree.ngap2 
     """
 }
 
-process progressive_alignment {
+/**process metrics{
     tag "${id}"
-    publishDir "${params.output}/alignments", mode: 'copy', overwrite: true
+    publishDir "${params.outdir}/metrics", mode: 'copy', overwrite: true
+
+    input:
+    set val(id), \
+      val(align_method), \
+      val(tree_method), \
+      val(bucket_size), \
+      val(mode), \
+      val(metricsPath) \
+      from metricsReg
+
+    when:
+      params.metrics
+
+    output:
+    set file("${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.metrics"), \
+      file("*.realtime"), \
+      file("*.rss"), \
+      file("*.peakRss"), \
+      file("*.vmem"), \
+      file("*.peakVmem") \
+        into metricsOut
+
+    script:
+    """    
+    mv ${metricsPath}/.command.trace metrics.txt
+
+    ## realtime > Task execution time i.e. delta between completion and start timestamp i.e. compute wall-time
+    awk -F = '{ if (\$1=="") print \$2}' metrics.txt > ${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.realtime
+
+    ## rss > Real memory (resident set) size of the process
+    awk -F = '{ if (\$1=="rss") print \$2}' metrics.txt > ${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.rss
+
+    ## peakRss > Peak of real memory
+    awk -F = '{ if (\$1=="peakRss") print \$2}' metrics.txt > ${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.peakRss
+
+    ## vmem > Virtual memory size of the process
+    awk -F = '{ if (\$1=="vmem") print \$2}' metrics.txt > ${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.vmem
+
+    ## peakVmem > Peak of virtual memory
+    awk -F = '{ if (\$1=="peakVmem") print \$2}' metrics.txt > ${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.peakVmem
+
+    mv metrics.txt ${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.metrics
+    """
+}
+**/
+process progressive_alignment {
+    tag "${id}-${align_method}-${bucket_size}-${tree_method}"
+    publishDir "${params.outdir}/alignments", mode: 'copy', overwrite: true
 
     input:
         set val(id), \
@@ -247,6 +299,7 @@ process progressive_alignment {
         file(guide_tree), \
         file(seqs) \
         from seqsAndTreesForProgressiveAlignment
+    each align_method from align_methods.tokenize(',') 
 
     when:
       params.progressive_align
@@ -259,6 +312,16 @@ process progressive_alignment {
         val("NA"), \
         file("${id}.prog_align.NA.${align_method}.with.${tree_method}.tree.aln") \
         into progressiveOut
+
+      /**
+      set val(id), \
+        val("${align_method}"), \
+        val(tree_method), \
+        val("NA"), \
+        val("prog_align"), \
+        file(".command.trace") \
+        into metricsProg
+        **/
 
     script:
       template "prog_align/prog_align_${align_method}.sh"
@@ -275,7 +338,8 @@ refs
 
 process evaluation {
     tag "${id}.${align_method}.${tree_method}.${align_type}.${bucket_size}"
-    publishDir "${params.output}/individual_scores", mode: 'copy', overwrite: true
+    publishDir "${params.outdir}/individual_scores", mode: 'copy', overwrite: true
+    label 'process_low'
 
     input:
       set val(id), \

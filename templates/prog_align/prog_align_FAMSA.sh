@@ -1,0 +1,1 @@
+famsa -gt_import ${guide_tree} ${seqs} ${id}.prog_align.NA.${align_method}.with.${tree_method}.tree.aln
