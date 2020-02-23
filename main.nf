@@ -43,7 +43,7 @@ params.refs = "/users/cn/egarriga/datasets/homfam/refs/*.ref"
 //params.trees ="/home/edgar/CBCRG/nf_homoplasty/results_trees"
 
 // which tree methods to run if `trees` == `false`
-params.tree_method = "dpparttreednd1,fastaparttreednd"
+params.tree_method = "dpparttreednd0"
 //codnd,dpparttreednd1,dpparttreednd2,dpparttreednd2size,fastaparttreednd,fftns1dnd,fftns1dndmem,fftns2dnd,fftns2dndmem,mafftdnd,parttreednd0,parttreednd1,parttreednd2,parttreednd2size
 
 // which alignment methods to run
@@ -53,14 +53,14 @@ params.align_method = "FAMSA" //CLUSTALO,MAFFT-FFTNS1,MAFFT-SPARSECORE,UPP,MAFFT
 params.regressive_align = true
 
 // create standard alignments ?
-params.progressive_align = true
+params.progressive_align = false
 
 // evaluate alignments ?
-params.evaluate = true
+params.evaluate = false
 
 params.homoplasy = true
 
-params.metrics = false
+params.metrics = true
 
 // bucket sizes for regressive algorithm
 params.buckets= '1000'
@@ -186,15 +186,13 @@ process regressive_alignment {
         file("${id}.homoplasy") \
         into homoReg
 
-      /**
       set val(id), \
         val("${align_method}"), \
         val(tree_method), \
         val(bucket_size), \
         val("reg_align"), \
-        val("$PWD") \
+        file(".command.trace") \
         into metricsReg
-      **/
 
     script:
        template "reg_align/reg_align_${align_method}.sh"
@@ -241,7 +239,7 @@ process homoplasy{
     """
 }
 
-/**process metrics{
+process metrics{
     tag "${id}"
     publishDir "${params.outdir}/metrics", mode: 'copy', overwrite: true
 
@@ -251,7 +249,7 @@ process homoplasy{
       val(tree_method), \
       val(bucket_size), \
       val(mode), \
-      val(metricsPath) \
+      val(metricsFile) \
       from metricsReg
 
     when:
@@ -263,32 +261,31 @@ process homoplasy{
       file("*.rss"), \
       file("*.peakRss"), \
       file("*.vmem"), \
-      file("*.peakVmem") \
+      file("*.peakVmem"), \
+      file("*.metrics") \
         into metricsOut
 
     script:
     """    
-    mv ${metricsPath}/.command.trace metrics.txt
-
     ## realtime > Task execution time i.e. delta between completion and start timestamp i.e. compute wall-time
-    awk -F = '{ if (\$1=="") print \$2}' metrics.txt > ${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.realtime
+    awk -F = '{ if (\$1=="") print \$2}' ${metricsFile} > ${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.realtime
 
     ## rss > Real memory (resident set) size of the process
-    awk -F = '{ if (\$1=="rss") print \$2}' metrics.txt > ${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.rss
+    awk -F = '{ if (\$1=="rss") print \$2}' ${metricsFile}> ${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.rss
 
     ## peakRss > Peak of real memory
-    awk -F = '{ if (\$1=="peakRss") print \$2}' metrics.txt > ${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.peakRss
+    awk -F = '{ if (\$1=="peakRss") print \$2}' ${metricsFile} > ${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.peakRss
 
     ## vmem > Virtual memory size of the process
-    awk -F = '{ if (\$1=="vmem") print \$2}' metrics.txt > ${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.vmem
+    awk -F = '{ if (\$1=="vmem") print \$2}' ${metricsFile} > ${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.vmem
 
     ## peakVmem > Peak of virtual memory
-    awk -F = '{ if (\$1=="peakVmem") print \$2}' metrics.txt > ${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.peakVmem
+    awk -F = '{ if (\$1=="peakVmem") print \$2}' ${metricsFile} > ${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.peakVmem
 
-    mv metrics.txt ${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.metrics
+    mv ${metricsFile} ${id}.${mode}.${bucket_size}.${align_method}.with.${tree_method}.tree.metrics
     """
 }
-**/
+
 process progressive_alignment {
     tag "${id}-${align_method}-${bucket_size}-${tree_method}"
     publishDir "${params.outdir}/alignments", mode: 'copy', overwrite: true
@@ -312,8 +309,7 @@ process progressive_alignment {
         val("NA"), \
         file("${id}.prog_align.NA.${align_method}.with.${tree_method}.tree.aln") \
         into progressiveOut
-
-      /**
+/**
       set val(id), \
         val("${align_method}"), \
         val(tree_method), \
@@ -321,8 +317,7 @@ process progressive_alignment {
         val("prog_align"), \
         file(".command.trace") \
         into metricsProg
-        **/
-
+**/
     script:
       template "prog_align/prog_align_${align_method}.sh"
 }
