@@ -31,9 +31,16 @@ class Aln:
         self.deltaacc=deltaacc
 
 class Global:
-    def __init__(self,Nratio,unusedRatio):
+    def __init__(self,Nratio,Nnumber,usedNumber,unusedRatio,unusedNumber,totalpoint,minacc,maxacc,deltaacc):
         self.Nratio=Nratio
+        self.Nnumber=Nnumber
+        self.usedNumber=usedNumber
         self.unusedRatio=unusedRatio
+        self.unusedNumber=unusedNumber
+        self.totalpoint=totalpoint
+        self.minacc=minacc
+        self.maxacc=maxacc
+        self.deltaacc=deltaacc
 
 
 fams=[]
@@ -49,7 +56,7 @@ with open(fil) as f:
             tmp=fields[0].split(":")
             tmp=[x for x in tmp if x]   
             fam=tmp[1]
-
+            
             # Get aligner name
             aligner=fields[1][1:-2]
 
@@ -106,8 +113,17 @@ with open(fil) as f:
         elif line[:6]=="GLOBAL":
             fields=line.split(" ")
             Nratio=float(fields[1])
-            unusedRatio=float(fields[4])
-            glob=Global(Nratio,unusedRatio)
+            tmp=fields[2].split("/")
+            Nnumber=int(tmp[0][1:])
+            usedNumber=int(tmp[1][:-1])
+            unusedRatio=float(fields[5])
+            tmp=fields[6].split("/")
+            unusedNumber=int(tmp[0][1:])
+            totalpoint=int(tmp[1][:-1])
+            minacc=float(fields[9])
+            maxacc=float(fields[12])
+            deltaacc=float(fields[15][:-1])
+            glob=Global(Nratio,Nnumber,usedNumber,unusedRatio,unusedNumber,totalpoint,minacc,maxacc,deltaacc)
 
 
 # Write output
@@ -118,11 +134,11 @@ for c in sorted(fams, key=lambda x: (x.aligner, x.fam)):
     o.write("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(c.fam, c.aligner, c.Nratio, c.Nnumber, c.usedNumber, c.unusedRatio, c.unusedNumber, c.totalpoint))
 o.close()
 o=open(pre+"_aln.tsv","w")
-o.write("aligner\tNratio\tNnumber\tusedNumber\tunusedRatio\tunusedNumber\ttotal\tnfam\tminacc\tmaxacc\tdeltaacc\n")
+o.write("aligner\tNratio\tunusedRatio\tnfam\tminacc\tmaxacc\tdeltaacc\n")
 for c in alns:
     o.write("{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(c.aligner, c.Nratio, c.unusedRatio, c.nfam, c.minacc, c.maxacc, c.deltaacc))
 o.close()
 o=open(pre+"_global.tsv","w")
-o.write("Nratio\tunusedRatio\n")
-o.write("{}\t{}\n".format(glob.Nratio, glob.unusedRatio))
+o.write("Nratio\tunusedRatio\tminacc\tmaxacc\tdeltaacc\n")
+o.write("{}\t{}\t{}\t{}\t{}\n".format(glob.Nratio, glob.unusedRatio, glob.minacc, glob.maxacc, glob.deltaacc))
 o.close()
