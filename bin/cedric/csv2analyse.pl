@@ -26,9 +26,11 @@ my $maxseq=100000;
 my $mrdelta=0.2;
 my $score="sp";
 my $metrics="ngap";
+my $norm="original";
 my $dir=getcwd;
 
 
+# Parse arguments
 for (my $a=0; $a<=$#ARGV; $a++)
   {
     if ($ARGV[$a] eq "-minseq"){$minseq=$ARGV[++$a];}
@@ -36,6 +38,7 @@ for (my $a=0; $a<=$#ARGV; $a++)
     elsif ($ARGV[$a] eq "-mrdelta"){$mrdelta=$ARGV[++$a];}
     elsif ($ARGV[$a] eq "-score"){$score=$ARGV[++$a];}
     elsif ($ARGV[$a] eq "-metrics"){$metrics=$ARGV[++$a];}
+	elsif ($ARGV[$a] eq "-norm"){$norm=$ARGV[++$a];}  # See normalization section
     elsif ($ARGV[$a] eq "-dir"){$dir=$ARGV[++$a];}
     else 
       {
@@ -44,55 +47,15 @@ for (my $a=0; $a<=$#ARGV; $a++)
       }
   }
 
-my @originalMetrics=("ngap","ngap2","homo","whomo","whomo2");
-my @normalizedMetrics=("ngapPerLen","ngapPerSeq","ngapPerLenSeq","homoPerLen","homoByLen","homoPerSeq","homoBySeq","homoPerLenSeq","homoByLenSeq","whomoPerLen","whomoByLen","whomoPerSeq","whomoBySeq","whomoPerLenSeq","whomoByLenSeq","whomo2PerLen","whomo2ByLen","whomo2PerSeq","whomo2BySeq","whomo2PerLenSeq","whomo2ByLenSeq");
-my %len=csv2h("$dir/len.csv");
+
+# Files
 my %sp=csv2h("$dir/sp.csv");
 my %tc=csv2h("$dir/tc.csv");
 my %col=csv2h("$dir/col.csv");
-my %ngap=csv2h("$dir/ngap.csv");
-my %ngap2=csv2h("$dir/ngap2.csv");
-my %homo=csv2h("$dir/homo.csv");
-my %whomo=csv2h("$dir/whomo.csv");
-my %whomo2=csv2h("$dir/whomo2.csv");
-# ngap normalized
-my %ngapPerLen;
-my %ngapPerSeq;
-my %ngapPerLenSeq;
-my %ngapByLen;
-my %ngapBySeq;
-my %ngapByLenSeq;
-# ngap2 normalized
-my %ngap2PerLen;
-my %ngap2PerSeq;
-my %ngap2PerLenSeq;
-my %ngap2ByLen;
-my %ngap2BySeq;
-my %ngap2ByLenSeq;
-# homo normalized
-my %homoPerLen;
-my %homoByLen;
-my %homoPerSeq;
-my %homoBySeq;
-my %homoPerLenSeq;
-my %homoByLenSeq;
-# whomo normalized
-my %whomoPerLen;
-my %whomoByLen;
-my %whomoPerSeq;
-my %whomoBySeq;
-my %whomoPerLenSeq;
-my %whomoByLenSeq;
-# whomo2 normalized
-my %whomo2PerLen;
-my %whomo2ByLen;
-my %whomo2PerSeq;
-my %whomo2BySeq;
-my %whomo2PerLenSeq;
-my %whomo2ByLenSeq;
+my %len=csv2h("$dir/len.csv");
+my %metricsF=csv2h("$dir/$metrics.csv");
 
-
-
+# Info
 $ignore{"Family"}=1;
 $ignore{"nseq"}=1;
 my @fam=keys(%len);
@@ -101,147 +64,59 @@ my @fam=keys(%len);
 @tree=shrinklist(@tree);
 
 
+# Score 
+if    ($score eq "sp") {%scoreH=%sp;}
+elsif ($score eq "col"){%scoreH=%col;}
+elsif ($score eq "tc") {%scoreH=%tc;}
+
 
 #@tree=("codnd", "parttreednd0");
 
 
+# Normalization
 foreach my $aln (@aligner)
   {
     foreach my $f (@fam) 
       {
 	foreach my $t1 (@tree)
 	  {
-		# ngap
-	    if ($len{$f}{$aln}{$t1}>0  && $ngap {$f}{$aln}{$t1} ne "NA"){$ngapPerLen {$f}{$aln}{$t1}=$ngap  {$f}{$aln}{$t1}/$len{$f}{$aln}{$t1};}
-		if ($len{$f}{nseq}{nseq}>0  && $ngap {$f}{$aln}{$t1} ne "NA"){$ngapPerSeq {$f}{$aln}{$t1}=$ngap  {$f}{$aln}{$t1}/$len{$f}{nseq}{nseq};}
-		if ($len{$f}{nseq}{nseq}>0  && $len{$f}{$aln}{$t1}>0 && $ngap {$f}{$aln}{$t1} ne "NA"){$ngapPerLenSeq {$f}{$aln}{$t1}=$ngap  {$f}{$aln}{$t1}/$len{$f}{nseq}{nseq}/$len{$f}{$aln}{$t1};}
-		if ($len{$f}{$aln}{$t1}>0  && $ngap {$f}{$aln}{$t1} ne "NA"){$ngapByLen {$f}{$aln}{$t1}=$ngap  {$f}{$aln}{$t1}*$len{$f}{$aln}{$t1};}
-		if ($len{$f}{nseq}{nseq}>0  && $ngap {$f}{$aln}{$t1} ne "NA"){$ngapBySeq {$f}{$aln}{$t1}=$ngap  {$f}{$aln}{$t1}*$len{$f}{nseq}{nseq};}
-		if ($len{$f}{nseq}{nseq}>0  && $len{$f}{$aln}{$t1}>0 && $ngap {$f}{$aln}{$t1} ne "NA"){$ngapByLenSeq {$f}{$aln}{$t1}=$ngap  {$f}{$aln}{$t1}*$len{$f}{nseq}{nseq}*$len{$f}{$aln}{$t1};}
-		# ngap2
-	    if ($len{$f}{$aln}{$t1}>0  && $ngap2 {$f}{$aln}{$t1} ne "NA"){$ngap2PerLen {$f}{$aln}{$t1}=$ngap2  {$f}{$aln}{$t1}/$len{$f}{$aln}{$t1};}
-		if ($len{$f}{nseq}{nseq}>0  && $ngap2 {$f}{$aln}{$t1} ne "NA"){$ngap2PerSeq {$f}{$aln}{$t1}=$ngap2  {$f}{$aln}{$t1}/$len{$f}{nseq}{nseq};}
-		if ($len{$f}{nseq}{nseq}>0  && $len{$f}{$aln}{$t1}>0 && $ngap2 {$f}{$aln}{$t1} ne "NA"){$ngap2PerLenSeq {$f}{$aln}{$t1}=$ngap2  {$f}{$aln}{$t1}/$len{$f}{nseq}{nseq}/$len{$f}{$aln}{$t1};}
-		if ($len{$f}{$aln}{$t1}>0  && $ngap2 {$f}{$aln}{$t1} ne "NA"){$ngap2ByLen {$f}{$aln}{$t1}=$ngap2  {$f}{$aln}{$t1}*$len{$f}{$aln}{$t1};}
-		if ($len{$f}{nseq}{nseq}>0  && $ngap2 {$f}{$aln}{$t1} ne "NA"){$ngap2BySeq {$f}{$aln}{$t1}=$ngap2  {$f}{$aln}{$t1}*$len{$f}{nseq}{nseq};}
-		if ($len{$f}{nseq}{nseq}>0  && $len{$f}{$aln}{$t1}>0 && $ngap2 {$f}{$aln}{$t1} ne "NA"){$ngap2ByLenSeq {$f}{$aln}{$t1}=$ngap2  {$f}{$aln}{$t1}*$len{$f}{nseq}{nseq}*$len{$f}{$aln}{$t1};}
-		# homo
-		if ($len{$f}{$aln}{$t1}>0  && $homo{$f}{$aln}{$t1} ne "NA"){$homoPerLen{$f}{$aln}{$t1}=$homo{$f}{$aln}{$t1}/$len{$f}{$aln}{$t1};}
-		if ($len{$f}{$aln}{$t1}>0  && $homo{$f}{$aln}{$t1} ne "NA"){$homoByLen{$f}{$aln}{$t1}=$homo{$f}{$aln}{$t1}*$len{$f}{$aln}{$t1};}
-		if ($len{$f}{nseq}{nseq}>0  && $homo{$f}{$aln}{$t1} ne "NA"){$homoPerSeq{$f}{$aln}{$t1}=$homo{$f}{$aln}{$t1}/$len{$f}{nseq}{nseq};}
-		if ($len{$f}{nseq}{nseq}>0  && $homo{$f}{$aln}{$t1} ne "NA"){$homoBySeq{$f}{$aln}{$t1}=$homo{$f}{$aln}{$t1}*$len{$f}{nseq}{nseq};}
-		if ($len{$f}{nseq}{nseq}>0 && $len{$f}{$aln}{$t1}>0  && $homo{$f}{$aln}{$t1} ne "NA"){$homoPerLenSeq{$f}{$aln}{$t1}=$homo{$f}{$aln}{$t1}/$len{$f}{$aln}{$t1}/$len{$f}{nseq}{nseq};}
-		if ($len{$f}{nseq}{nseq}>0 && $len{$f}{$aln}{$t1}>0  && $homo{$f}{$aln}{$t1} ne "NA"){$homoByLenSeq{$f}{$aln}{$t1}=$homo{$f}{$aln}{$t1}*$len{$f}{$aln}{$t1}*$len{$f}{nseq}{nseq};}
-		# whomo
-		if ($len{$f}{$aln}{$t1}>0  && $whomo{$f}{$aln}{$t1} ne "NA"){$whomoPerLen{$f}{$aln}{$t1}=$whomo{$f}{$aln}{$t1}/$len{$f}{$aln}{$t1};}
-		if ($len{$f}{$aln}{$t1}>0  && $whomo{$f}{$aln}{$t1} ne "NA"){$whomoByLen{$f}{$aln}{$t1}=$whomo{$f}{$aln}{$t1}*$len{$f}{$aln}{$t1};}
-		if ($len{$f}{nseq}{nseq}>0  && $whomo{$f}{$aln}{$t1} ne "NA"){$whomoPerSeq{$f}{$aln}{$t1}=$whomo{$f}{$aln}{$t1}/$len{$f}{nseq}{nseq};}
-		if ($len{$f}{nseq}{nseq}>0  && $whomo{$f}{$aln}{$t1} ne "NA"){$whomoBySeq{$f}{$aln}{$t1}=$whomo{$f}{$aln}{$t1}*$len{$f}{nseq}{nseq};}
-		if ($len{$f}{nseq}{nseq}>0 && $len{$f}{$aln}{$t1}>0  && $whomo{$f}{$aln}{$t1} ne "NA"){$whomoPerLenSeq{$f}{$aln}{$t1}=$whomo{$f}{$aln}{$t1}/$len{$f}{$aln}{$t1}/$len{$f}{nseq}{nseq};}
-		if ($len{$f}{nseq}{nseq}>0 && $len{$f}{$aln}{$t1}>0  && $whomo{$f}{$aln}{$t1} ne "NA"){$whomoByLenSeq{$f}{$aln}{$t1}=$whomo{$f}{$aln}{$t1}*$len{$f}{$aln}{$t1}*$len{$f}{nseq}{nseq};}
-		# whomo2
-	    if ($len{$f}{$aln}{$t1}>0  && $whomo2{$f}{$aln}{$t1} ne "NA"){$whomo2PerLen{$f}{$aln}{$t1}=$whomo2{$f}{$aln}{$t1}/$len{$f}{$aln}{$t1};}
-		if ($len{$f}{$aln}{$t1}>0  && $whomo2{$f}{$aln}{$t1} ne "NA"){$whomo2ByLen{$f}{$aln}{$t1}=$whomo2{$f}{$aln}{$t1}*$len{$f}{$aln}{$t1};}
-		if ($len{$f}{nseq}{nseq}>0  && $whomo2{$f}{$aln}{$t1} ne "NA"){$whomo2PerSeq{$f}{$aln}{$t1}=$whomo2{$f}{$aln}{$t1}/$len{$f}{nseq}{nseq};}
-		if ($len{$f}{nseq}{nseq}>0  && $whomo2{$f}{$aln}{$t1} ne "NA"){$whomo2BySeq{$f}{$aln}{$t1}=$whomo2{$f}{$aln}{$t1}*$len{$f}{nseq}{nseq};}
-		if ($len{$f}{nseq}{nseq}>0 && $len{$f}{$aln}{$t1}>0  && $whomo2{$f}{$aln}{$t1} ne "NA"){$whomo2PerLenSeq{$f}{$aln}{$t1}=$whomo2{$f}{$aln}{$t1}/$len{$f}{$aln}{$t1}/$len{$f}{nseq}{nseq};}
-		if ($len{$f}{nseq}{nseq}>0 && $len{$f}{$aln}{$t1}>0  && $whomo2{$f}{$aln}{$t1} ne "NA"){$whomo2ByLenSeq{$f}{$aln}{$t1}=$whomo2{$f}{$aln}{$t1}*$len{$f}{$aln}{$t1}*$len{$f}{nseq}{nseq};}
-	    
-	    else
-	      {
-		# ngap
-		$ngapPerLen{$f}{$aln}{$t1}="NA";
-		$ngapPerSeq{$f}{$aln}{$t1}="NA";
-		$ngapPerLenSeq{$f}{$aln}{$t1}="NA";
-		$ngapByLen{$f}{$aln}{$t1}="NA";
-		$ngapBySeq{$f}{$aln}{$t1}="NA";
-		$ngapByLenSeq{$f}{$aln}{$t1}="NA";
-		# ngap2
-		$ngap2PerLen{$f}{$aln}{$t1}="NA";
-		$ngap2PerSeq{$f}{$aln}{$t1}="NA";
-		$ngap2PerLenSeq{$f}{$aln}{$t1}="NA";
-		$ngap2ByLen{$f}{$aln}{$t1}="NA";
-		$ngap2BySeq{$f}{$aln}{$t1}="NA";
-		$ngap2ByLenSeq{$f}{$aln}{$t1}="NA";
-		# homo
-		$homoPerLen{$f}{$aln}{$t1}="NA";
-		$homoPerSeq{$f}{$aln}{$t1}="NA";
-		$homoPerLenSeq{$f}{$aln}{$t1}="NA";
-		$homoByLen{$f}{$aln}{$t1}="NA";
-		$homoBySeq{$f}{$aln}{$t1}="NA";
-		$homoByLenSeq{$f}{$aln}{$t1}="NA";
-		# whomo
-		$whomoPerLen{$f}{$aln}{$t1}="NA";
-		$whomoPerSeq{$f}{$aln}{$t1}="NA";
-		$whomoPerLenSeq{$f}{$aln}{$t1}="NA";
-		$whomoByLen{$f}{$aln}{$t1}="NA";
-		$whomoBySeq{$f}{$aln}{$t1}="NA";
-		$whomoByLenSeq{$f}{$aln}{$t1}="NA";
-		# whomo2
-		$whomo2PerLen{$f}{$aln}{$t1}="NA";
-		$whomo2PerSeq{$f}{$aln}{$t1}="NA";
-		$whomo2PerLenSeq{$f}{$aln}{$t1}="NA";
-		$whomo2ByLen{$f}{$aln}{$t1}="NA";
-		$whomo2BySeq{$f}{$aln}{$t1}="NA";
-		$whomo2ByLenSeq{$f}{$aln}{$t1}="NA";
-	      }
+		if ($norm ne "original")
+		  {
+			  if ($norm eq "PerLen")  # metric / length
+			    {
+					if ($len{$f}{$aln}{$t1}>0  && $metricsF {$f}{$aln}{$t1} ne "NA"){$metricsH{$f}{$aln}{$t1}=$metricsF{$f}{$aln}{$t1}/$len{$f}{$aln}{$t1};}
+					else {$metricsF{$f}{$aln}{$t1}="NA";}
+			    }
+			  elsif ($norm eq "ByLen") # metric * length
+			    {
+					if ($len{$f}{$aln}{$t1}>0  && $metricsF {$f}{$aln}{$t1} ne "NA"){$metricsH{$f}{$aln}{$t1}=$metricsF{$f}{$aln}{$t1}*$len{$f}{$aln}{$t1};}
+					else {$metricsF{$f}{$aln}{$t1}="NA";}
+				}
+			  elsif ($norm eq "PerSeq") # metric / nseq
+			    {
+					if ($len{$f}{nseq}{nseq}>0 && $metricsF{$f}{$aln}{$t1} ne "NA"){$metricsH{$f}{$aln}{$t1}=$metricsF{$f}{$aln}{$t1}/$len{$f}{nseq}{nseq};}
+					else {$metricsF{$f}{$aln}{$t1}="NA";}
+				}
+			  elsif ($norm eq "BySeq") # metric * nseq
+			    {
+					if ($len{$f}{nseq}{nseq}>0 && $metricsF{$f}{$aln}{$t1} ne "NA"){$metricsH{$f}{$aln}{$t1}=$metricsF{$f}{$aln}{$t1}*$len{$f}{nseq}{nseq};}
+					else {$metricsF{$f}{$aln}{$t1}="NA";}
+				}
+			  elsif ($norm eq "PerLenSeq")  # metric / length / nseq
+			    {
+					if ($len{$f}{nseq}{nseq}>0 && $len{$f}{$aln}{$t1}>0  && $metricsF{$f}{$aln}{$t1} ne "NA"){$metricsH{$f}{$aln}{$t1}=$metricsF{$f}{$aln}{$t1}/$len{$f}{$aln}{$t1}/$len{$f}{nseq}{nseq};}
+					else {$metricsF{$f}{$aln}{$t1}="NA";}
+				}
+			  elsif ($norm eq "ByLenSeq")   # metric * length * nseq
+			    {
+					if ($len{$f}{nseq}{nseq}>0 && $len{$f}{$aln}{$t1}>0  && $metricsF{$f}{$aln}{$t1} ne "NA"){$metricsH{$f}{$aln}{$t1}=$metricsF{$f}{$aln}{$t1}*$len{$f}{$aln}{$t1}*$len{$f}{nseq}{nseq};}
+					else {$metricsF{$f}{$aln}{$t1}="NA";}
+				}
+		  }
+		else {%metricsH=%metricsF;}
 	  }
       }
   }
-
-#select score
-if    ($score eq "sp") {%scoreH=%sp;}
-elsif ($score eq "col"){%scoreH=%col;}
-elsif ($score eq "tc") {%scoreH=%tc;}
-
-#select metrics
-if    ($metrics eq "ngap")  {%metricsH=%ngap;}
-elsif ($metrics eq "ngap2") {%metricsH=%ngap2;}
-elsif ($metrics eq "len")   {%metricsH=%len;}
-
-elsif ($metrics eq "homo")  {%metricsH=%homo;}
-elsif ($metrics eq "whomo") {%metricsH=%whomo;}
-elsif ($metrics eq "whomo2"){%metricsH=%whomo2;}
-
-# ngap normalized
-elsif ($metrics eq "ngapPerLen") {%metricsH=%ngapPerLen;}
-elsif ($metrics eq "ngapPerSeq") {%metricsH=%ngapPerSeq;}
-elsif ($metrics eq "ngapPerLenSeq") {%metricsH=%ngapPerLenSeq;}
-elsif ($metrics eq "ngapByLen") {%metricsH=%ngapPerLen;}
-elsif ($metrics eq "ngapBySeq") {%metricsH=%ngapPerSeq;}
-elsif ($metrics eq "ngapByLenSeq") {%metricsH=%ngapPerLenSeq;}
-
-# ngap2 normalized
-elsif ($metrics eq "ngap2PerLen") {%metricsH=%ngap2PerLen;}
-elsif ($metrics eq "ngap2PerSeq") {%metricsH=%ngap2PerSeq;}
-elsif ($metrics eq "ngap2PerLenSeq") {%metricsH=%ngap2PerLenSeq;}
-elsif ($metrics eq "ngap2ByLen") {%metricsH=%ngap2PerLen;}
-elsif ($metrics eq "ngap2BySeq") {%metricsH=%ngap2PerSeq;}
-elsif ($metrics eq "ngap2ByLenSeq") {%metricsH=%ngap2PerLenSeq;}
-
-# homo normalized
-elsif ($metrics eq "homoPerLen") {%metricsH=%homoPerLen;}
-elsif ($metrics eq "homoPerSeq") {%metricsH=%homoPerSeq;}
-elsif ($metrics eq "homoPerLenSeq") {%metricsH=%homoPerLenSeq;}
-elsif ($metrics eq "homoByLen") {%metricsH=%homoByLen;}
-elsif ($metrics eq "homoBySeq") {%metricsH=%homoBySeq;}
-elsif ($metrics eq "homoByLenSeq") {%metricsH=%homoByLenSeq;}
-
-# whomo normalized
-elsif ($metrics eq "whomoPerLen") {%metricsH=%whomoPerLen;}
-elsif ($metrics eq "whomoPerSeq") {%metricsH=%whomoPerSeq;}
-elsif ($metrics eq "whomoPerLenSeq") {%metricsH=%whomoPerLenSeq;}
-elsif ($metrics eq "whomoByLen") {%metricsH=%whomoByLen;}
-elsif ($metrics eq "whomoBySeq") {%metricsH=%whomoBySeq;}
-elsif ($metrics eq "whomoByLenSeq") {%metricsH=%whomoByLenSeq;}
-
-# whomo2 normalized
-elsif ($metrics eq "whomo2PerLen") {%metricsH=%whomo2PerLen;}
-elsif ($metrics eq "whomo2PerSeq") {%metricsH=%whomo2PerSeq;}
-elsif ($metrics eq "whomo2PerLenSeq") {%metricsH=%whomo2PerLenSeq;}
-elsif ($metrics eq "whomo2ByLen") {%metricsH=%whomo2ByLen;}
-elsif ($metrics eq "whomo2BySeq") {%metricsH=%whomo2BySeq;}
-elsif ($metrics eq "whomo2ByLenSeq") {%metricsH=%whomo2ByLenSeq;}
 
 
 
@@ -292,18 +167,15 @@ foreach my $aln (@aligner)
 		  {
 		    $NN{$aln}{$f}{unused}++;
 		  }
-		elsif ($metrics ~~ @originalMetrics && abs($D1)<=0.001 && abs($D2)<=0.001)
+		elsif ($norm eq "original" && abs($D1)<=0.001 && abs($D2)<=0.001)
 		  {
 		    $NN{$aln}{$f}{unused}++;
 		  }
-		elsif ($metrics ~~ @normalizedMetrics && abs($D1)<=0.0000000000001 && abs($D2)<=0.0000000000001)
+		elsif ($norm ne "original" && abs($D1)<=0.0000000000001 && abs($D2)<=0.0000000000001)
+		#elsif ($norm ne "original" && abs($D1)<=0.001 && abs($D2)<=0.001)
 		  {
 		    $NN{$aln}{$f}{unused}++;
 		  }
-		# elsif (abs($D1)<=0.0000001 && abs($D2)<=0.0000001)
-		#   {
-		#     $NN{$aln}{$f}{unused}++;
-		#   }
 		elsif (($D2>=0 && $D1>=0) || ($D2<=0 && $D1<=0))
 		  {
 			#printf "+usedfamily $aln $f\n";
@@ -333,7 +205,7 @@ foreach my $aln (@aligner)
 		    $totN++;
 		    $use=1;
 		  }
-		if ($use)
+		if ($use) 
 		  {
 		    if ($h1>$h2)
 		      {
