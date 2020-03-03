@@ -1,5 +1,5 @@
 bucket=bucket"$1"
-declare -a mrdeltas=(0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1)
+declare -a mrdeltas=(0 0.05 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 0.7 0.8 0.9 1)
 declare -a scores=(tc sp)
 declare -a metrics=(homo whomo whomo2 ngap ngap2 homoPerLen whomoPerLen whomo2PerLen ngapPerLen ngap2PerLen homoByLen whomoByLen whomo2ByLen ngapByLen ngap2ByLen homoPerSeq whomoPerSeq whomo2PerSeq ngapPerSeq ngap2PerSeq homoBySeq whomoBySeq whomo2BySeq ngapBySeq ngap2BySeq homoPerLenSeq whomoPerLenSeq whomo2PerLenSeq ngapPerLenSeq ngap2PerLenSeq homoByLenSeq whomoByLenSeq whomo2ByLenSeq ngapByLenSeq ngap2ByLenSeq)
 #declare -a metrics=(whomo whomo2 whomoPerLen whomo2PerLen whomoByLen whomo2ByLen whomoPerSeq whomo2PerSeq whomoBySeq whomo2BySeq whomoPerLenSeq whomo2PerLenSeq whomoByLenSeq whomo2ByLenSeq)
@@ -14,9 +14,10 @@ cedrictxt2colcsv=bin/cedric/cedrictxt2colcsv.py
 # Create files
 compute_homoplasy () {
     ori=data/raw/${bucket}  # Folder where the raw data files are stored
+    outori=data/mrdelta
     for mrdelta in ${mrdeltas[@]}; do
-        folder=${ori}/mrdelta${mrdelta}
-        [[ ! -d $folder ]] && mkdir $folder
+        folder=${outori}/${bucket}/mrdelta${mrdelta}
+        [[ ! -d $folder ]] && mkdir -p $folder
         for score in ${scores[@]}; do
             for metric in ${metrics[@]}; do
                 echo "perl $csv2analyse -mrdelta $mrdelta -score $score -metrics $metric -dir $ori > ${folder}/${score}_${metric}.txt"
@@ -30,8 +31,8 @@ compute_homoplasy () {
 # Merge data 
 # This will be used to plot
 merge_data () {
-    echo "+mrdelta merge ${bucket}"
-    ori=data/raw/${bucket}
+    echo "+mrdelta merge $bucket"
+    ori=data/mrdelta/${bucket}
     outori=data/mrdelta  # Where mrdelta merged output tables are stored
     outfam=${outori}/out.${bucket}.fam.tsv
     outaln=${outori}/out.${bucket}.aln.tsv
@@ -39,6 +40,7 @@ merge_data () {
     printf "mrdelta\tscore\tmetric\tfamily\taligner\tNratio\tNnumber\tusedNumber\tunusedRatio\tunusedNumber\ttotal\n" > $outfam
     printf "mrdelta\tscore\tmetric\taligner\tNratio\tunusedRatio\tnfam\tminacc\tmaxacc\tdeltaacc\n" > $outaln
     printf "mrdelta\tscore\tmetric\taligner\tNratio\tunusedRatio\tminacc\tmaxacc\tdeltaacc\n" > $outglobal
+    echo -e "\t+mrdelta merge global $bucket"
     for mrdelta in ${mrdeltas[@]}; do
         for score in ${scores[@]}; do
             for metric in ${metrics[@]}; do
@@ -46,6 +48,7 @@ merge_data () {
             done
         done
     done
+    echo -e "\t+mrdelta merge aln $bucket"
     for mrdelta in ${mrdeltas[@]}; do
         for score in ${scores[@]}; do
             for aligner in ${aligners[@]}; do
@@ -55,21 +58,29 @@ merge_data () {
             done
         done
     done
+    echo -e "\t+mrdelta merge fam $bucket"
     for mrdelta in ${mrdeltas[@]}; do
         for score in ${scores[@]}; do
-            #for fam in ${familyName[@]}; do
-            for fam in $familyList; do
-            for aligner in ${aligners[@]}; do
-                for metric in ${metrics[@]}; do
-                    awk -v mrdelta=$mrdelta -v score=$score -v metric=$metric -v fam=$fam 'NR!=1&&$1==fam&&$2==aligner{print mrdelta"\t"score"\t"metric"\t"$0}' ${ori}/mrdelta${mrdelta}/${score}_${metric}_fam.tsv >> $outfam
-                done
-            done
+            for metric in ${metrics[@]}; do
+                awk -v mrdelta=$mrdelta -v score=$score -v metric=$metric 'NR!=1{print mrdelta"\t"score"\t"metric"\t"$0}' ${ori}/mrdelta${mrdelta}/${score}_${metric}_fam.tsv >> $outfam
             done
         done
     done
+    # for mrdelta in ${mrdeltas[@]}; do
+    #     for score in ${scores[@]}; do
+    #         #for fam in ${familyName[@]}; do
+    #         for fam in $familyList; do
+    #         for aligner in ${aligners[@]}; do
+    #             for metric in ${metrics[@]}; do
+    #                 awk -v mrdelta=$mrdelta -v score=$score -v metric=$metric -v fam=$fam -v aligner=$aligner 'NR!=1&&$1==fam&&$2==aligner{print mrdelta"\t"score"\t"metric"\t"$0}' ${ori}/mrdelta${mrdelta}/${score}_${metric}_fam.tsv >> $outfam
+    #             done
+    #         done
+    #         done
+    #     done
+    # done
 }
 
 
-#compute_homoplasy
+compute_homoplasy
 merge_data
 

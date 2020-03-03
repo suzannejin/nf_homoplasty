@@ -304,8 +304,9 @@ foreach my $aln (@aligner)
 		#   {
 		#     $NN{$aln}{$f}{unused}++;
 		#   }
-		elsif (($D2>0 && $D1>=0) || ($D2<0 && $D1<=0))
+		elsif (($D2>=0 && $D1>=0) || ($D2<=0 && $D1<=0))
 		  {
+			#printf "+usedfamily $aln $f\n";
 		    $usedF{$aln}{$f}=1;
 		    $Tot++;
 		    $TotP++;
@@ -318,8 +319,9 @@ foreach my $aln (@aligner)
 
 		    $use=1;
 		  }
-	 	elsif (($D2>0 && $D1<=0) || ($D2<0 && $D1>=0))
+	 	elsif (($D2>0 && $D1<0) || ($D2<0 && $D1>0))
 		  {
+			#printf "+usedfamily $aln $f\n";
 		    $usedF{$aln}{$f}=1;
 		    $Tot++;
 		    $TotN++;

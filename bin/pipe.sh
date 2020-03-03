@@ -95,5 +95,5 @@ Rscript $mrdeltaPlotGlobalR
 
 #raw_delta_csv
 #csv2excel_original_norm
-mrdelta_analysis
+#mrdelta_analysis
 mrdelta_plot
