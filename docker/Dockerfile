@@ -129,15 +129,28 @@ RUN git clone http://github.com/smirarab/sepp.git && \
 #    chmod +x /msa/msa && \
 #    cp /msa/msa /bin/.
 
+# install FAMSA
+RUN git clone https://github.com/refresh-bio/FAMSA.git && \
+  cd FAMSA && \ 
+  sed -i 's/all: famsa famsa-gpu/all: famsa/' makefile && \
+  sed -i 's/NO_AVX = false/NO_AVX = true/' makefile && \
+  sed -i 's/NO_AVX2 = false/NO_AVX2 = true/' makefile && \
+  sed -i 's/NO_GPU = false/NO_GPU = true/' makefile && \
+  make && \
+  cp famsa /bin/.
+  
 # Install TCOFFEE
 RUN git clone https://github.com/edgano/tcoffee.git tcoffee && \
     cd tcoffee && \
-    git checkout 4596713bb79dea6299985bef71fd79229e4ecc67 && \
+    git checkout 6149f3a66143ad5fcba1a9427c0c5811ebd1eaca && \
     cd t_coffee/src && \
     make t_coffee && \
     cp t_coffee /bin/.
 
-ENV FASTA_4_MAFFT='/bin/fasta35'
-ENV CACHE_4_TCOFFEE='${TMPDIR:-/tmp}/.tcoffee/cache'
-ENV LOCKDIR_4_TCOFFEE='${TMPDIR:-/tmp}/.tcoffee/lock'
-ENV TMP_4_TCOFFEE='${TMPDIR:-/tmp}/.tcoffee/tmp'
+ENV FASTA_4_MAFFT /bin/fasta35
+
+ENV CACHE_4_TCOFFEE ${TMPDIR:-/tmp}/.tcoffee/cache
+ENV LOCKDIR_4_TCOFFEE ${TMPDIR:-/tmp}/.tcoffee/lock
+ENV TMP_4_TCOFFEE ${TMPDIR:-/tmp}/.tcoffee/tmp
+ENV HOME_4_TCOFFEE ~/.tcoffee/
+ENV HOME /
