@@ -17,38 +17,51 @@ def csv2analyse(df, score, metric, minseq, maxseq, mrdelta, maintain, deltaby, c
     
     '''
 
+    import collections
     import numpy as np
     import pandas as pd
 
     # Initialize counts
-    cols = maintain + ["between", "total", "unused", "ndeltaN", "ndeltaP", "minScore", "minNumb", "maxScore", "maxNumb"]
+    namecounts = ["total", "unused", "ndeltaN", "ndeltaP", "minScore", "minNumb", "maxScore", "maxNumb"]
+    cols = maintain + ["between"] + namecounts
     counts = pd.DataFrame(columns=cols)
 
     # Group by keys[0:2]
     # If key[3]==tree, then we will have a list of combinations with same bucket, aligner, family, but different tree
     # So that we can compute delta for tree1 and tree2 --> function compute_delta
+    index = 0
     g = list(csv.groupby(maintain))  
     for element in g: 
         names = list(element[0])
         #names = dict(zip(keys,element[0]))  # A dictionary with the names of the combinations. Eg { family: seatoxin, bucket: 50, aligner: CLUSTALO }
         comb  = element[1]  # A dataframe with same keys[0:2]. It has as many columns as the original dataframe.
-        ntot  = comb.shape[0] * (comb.shape[0]-1)  # Total number of deltas, if original data remained untouched
+        
+        # Dictionary of counts
+        c = dict(zip( maintain + ["between"],  names  + [deltaby] ))
+        c["total"]  = comb.shape[0] * (comb.shape[0]-1)  # Total number of deltas, if original data remained untouched
         comb  = filter_unused(comb, minseq, maxseq)  
         if comb.shape == 0:
             continue
         delta = compute_delta(comb, score, metric)
         delta = filter_delta(delta, mrdelta)
-        unused = ntot - delta.shape[0]  # Number of deltas filtered out
-        ndeltaN, ndeltaP, minScore, minNumb, maxScore, maxNumb = count_statistics(delta)
-        
-        # Merge info to dataframe
-        array_names = np.array([names + [deltaby]]).reshape(-1, 4)
-        array_counts = np.array([ntot, unused, ndeltaN, ndeltaP, \
-                        minScore, minNumb, maxScore, maxNumb]).reshape(-1, 8)
-        tmp = pd.concat( [pd.DataFrame(array_names, columns=cols[0:4]), pd.DataFrame(array_counts, columns=cols[4:])], axis=1 )
-        counts = pd.concat( [counts,tmp] )
+        c["unused"] = c["total"] - delta.shape[0]  # Number of deltas filtered out
+        c["ndeltaN"], c["ndeltaP"], c["minScore"], c["minNumb"], c["maxScore"], c["maxNumb"] = count_statistics(delta)
 
-    counts = counts.reset_index(drop=True)
+        # Merge info to dataframe
+        # array_names = np.array([names + [deltaby]]).reshape(-1, 4)
+        # array_counts = np.array([ntot, unused, ndeltaN, ndeltaP, \
+        #                 minScore, minNumb, maxScore, maxNumb]).reshape(-1, 8)
+        # tmp = pd.concat( [pd.DataFrame(array_names, columns=cols[0:4]), pd.DataFrame(array_counts, columns=cols[4:])], axis=1 )
+        tmp = pd.DataFrame(c, index=[index])
+        counts = pd.concat( [counts,tmp] )
+        index += 1
+
+    # Reset dtypes
+    c = dict(zip(namecounts, ['float64']*len(namecounts)))
+    if 'bucket' in maintain:
+        c['bucket'] = 'int32'
+    counts = counts.astype(c, errors='ignore', copy=False)
+
     return(counts)
         
 
@@ -82,6 +95,10 @@ def filter_delta(delta, mrdelta):
     # Remove if both abs delta <= 0.001
     val = 0.001
     cond = (abs(delta.delta_score) <= val) & (abs(delta.delta_metric) <= val)
+    delta = delta.drop(delta[cond].index)
+    
+    # Remove if metrics are 0
+    cond = (delta.metric1 == delta.metric2) & (delta.metric1 == 0)
     delta = delta.drop(delta[cond].index)
 
     # Remove if mrdelta < threshold
@@ -142,7 +159,7 @@ def compute_delta(comb, score, metric):
     
     # Compute mrdelta
     delta["mrdelta"] = 2 * abs(delta.metric1 - delta.metric2) / (delta.metric1 + delta.metric2)
-    
+
     return(delta)
 
 
@@ -196,35 +213,37 @@ def count_statistics(delta):
     return(ndeltaN, ndeltaP, minScore, minNumb, maxScore, maxNumb)
 
 
-def get_csv_allcomb_fixed(df, reverse, maintain, deltaby):
+def calculate_ratio(df, reverse):
 
-    import numpy as np
-    import pandas as pd
+    d = {}
 
     # Calculate
+    # Nratio Pratio unusedRatio minacc maxacc deltaacc     
     usedNumber = df["total"] - df["unused"]
-    Nratio = df["ndeltaN"] / usedNumber
-    Pratio = df["ndeltaP"] / usedNumber
-    unusedRatio = df["unused"] / df["total"]
-    minacc = df["minScore"] / df["minNumb"]
-    maxacc = df["maxScore"] / df["maxNumb"]
-    deltaacc = maxacc - minacc
-
-    # New dataframe
-    if not reverse:
-        ratio = ["Nratio", "Nnumber", "usedNumber", "unusedRatio", "unusedNumber", "total", "minacc", "maxacc", "deltaacc"]
-        cols = maintain + ratio
-        tmp_ratio = np.array( [ Nratio, df["ndeltaN"], usedNumber, unusedRatio, df["unused"], df["total"], \
-                              minacc, maxacc, deltaacc ] ).transpose()
-        df2 = pd.concat( [df[maintain], df["between"], pd.DataFrame(tmp_ratio, columns=ratio)], axis=1)
+    d["unusedRatio"] = df["unused"] / df["total"]
+    d["minacc"] = df["minScore"] / df["minNumb"]
+    d["maxacc"] = df["maxScore"] / df["maxNumb"]
+    d["deltaacc"] = d["maxacc"] - d["minacc"]
+    if reverse:
+        d["Pratio"] = df["ndeltaP"] / usedNumber
     else:
-        ratio = ["Pratio", "Pnumber", "usedNumber", "unusedRatio", "unusedNumber", "total", "minacc", "maxacc", "deltaacc"]
-        cols = maintain + ratio
-        tmp_ratio = np.array( [ Pratio, df["ndeltaP"], usedNumber, unusedRatio, df["unused"], df["total"], \
-                              minacc, maxacc, deltaacc ] ).transpose()
-        df2 = pd.concat( [df[maintain], df["between"], pd.DataFrame(tmp_ratio, columns=ratio)], axis=1)
+        d["Nratio"] = df["ndeltaN"] / usedNumber
+
+    return(d)
+
+
+# def get_csv_allcomb_fixed(df, reverse, maintain):
+
+#     import numpy as np
+#     import pandas as pd
+
+#     d = calculate_ratio(df, reverse)
+
+#     tmp1 = df[maintain]
+#     tmp2 = pd.DataFrame(d)
+#     df2 = pd.concat( [tmp1, tmp2], axis=1)
     
-    return(df2)
+#     return(df2)
 
 
 def get_ratio(df, reverse, maintain, deltaby):
@@ -233,50 +252,82 @@ def get_ratio(df, reverse, maintain, deltaby):
     import pandas as pd
 
     original = df.copy()
-    g = df.groupby(maintain)
 
     # Sum by group
-    lev = range(0, len(maintain))
+    g = df.groupby(maintain)
+    lev = [i for i in range(0, len(maintain) )]
     df = g.sum().reset_index(level=lev)
 
-    # Calculate
-    usedNumber = df["total"] - df["unused"]
-    Nratio = df["ndeltaN"] / usedNumber
-    Pratio = df["ndeltaP"] / usedNumber
-    unusedRatio = df["unused"] / df["total"]
-    minacc = df["minScore"] / df["minNumb"]
-    maxacc = df["maxScore"] / df["maxNumb"]
-    deltaacc = maxacc - minacc
+    # Calculate ratio
+    d = calculate_ratio(df, reverse)
+    tmp1 = df[maintain]
+    tmp2 = pd.DataFrame(d)
+    df2 = pd.concat( [tmp1, tmp2], axis=1)
 
-    # New dataframe
-    if not reverse:
-        ratio = ["Nratio", "Nnumber", "usedNumber", "unusedRatio", "unusedNumber", "total", "minacc", "maxacc", "deltaacc"]
-        cols = maintain + ratio
-        tmp_ratio = np.array( [ Nratio, df["ndeltaN"], usedNumber, unusedRatio, df["unused"], df["total"], \
-                              minacc, maxacc, deltaacc ] ).transpose()
-        df2 = pd.concat( [df[maintain], pd.DataFrame([deltaby]*df.shape[0], columns=["between"]), pd.DataFrame(tmp_ratio, columns=ratio)], axis=1)
-    else:
-        ratio = ["Pratio", "Pnumber", "usedNumber", "unusedRatio", "unusedNumber", "total", "minacc", "maxacc", "deltaacc"]
-        cols = maintain + ratio
-        tmp_ratio = np.array( [ Pratio, original["ndeltaP"], usedNumber, unusedRatio, df["unused"], df["total"], \
-                              minacc, maxacc, deltaacc ] ).transpose()
-        df2 = pd.concat( [df[maintain], pd.DataFrame([deltaby]*df.shape[0], columns=["between"]), pd.DataFrame(tmp_ratio, columns=ratio)], axis=1)
-    
     # Determine nfam
-    if "family" not in maintain:
-        nfam = []
-        for element in g:
-            comb = element[1]
-            nfam.append( len(comb["family"].unique()) )
-        df2 = pd.concat( [df2, pd.DataFrame(nfam, columns=["nfam"])], axis=1 )
+    nfam = []
+    for element in g:
+        comb = element[1]
+        cond = comb.unused < comb.total
+        nfam.append( len(comb[cond]["family"].unique()) )
+    df2["nfam"] = nfam
 
     return(df2)
+
+
+def get_global_ratio(df, reverse, deltaby):
+
+    import numpy as np
+    import pandas as pd
+
+    # Parse df
+    namecounts = ["total", "unused", "ndeltaN", "ndeltaP", "minScore", "minNumb", "maxScore", "maxNumb"]
+    df2 = df[namecounts].sum()
+
+    # Calculate
+    d = calculate_ratio(df2, reverse)
+    df2 = pd.DataFrame(d, index=[0])
+
+    # Determina nfam
+    cond = df.unused < df.total
+    nfam = len(df[cond]["family"].unique())
+    df2['nfam'] = nfam
+
+    return(df2)
+
+
+def add_columns(df, add_d, maintain, reverse, typeCount):
+
+    n = df.shape[0]
+
+    # Add columns
+    d = {}
+    for k,v in add_d.items():
+        d[k] = [v] * n
+    tmp = pd.DataFrame(d)
+    df = pd.concat( [tmp, df], axis=1 )
+
+    # Column names
+    if typeCount == "counts":
+        colcounts = ["total", "unused", "ndeltaN", "ndeltaP", "minScore", "minNumb", "maxScore", "maxNumb"]
+    else:
+        if reverse:
+            colcounts = ["Pratio", "unusedRatio", "nfam", "minacc", "maxacc", "deltaacc"]
+        else:
+            colcounts = ["Nratio", "unusedRatio", "nfam", "minacc", "maxacc", "deltaacc"]
+    cols = ["mrdelta", "score", "metric"] + maintain + ["between"] + colcounts
+
+    # Reorder columns
+    df = df[cols]
+
+    return(df)
 
 
 if __name__ == '__main__':
 
     import argparse
     import collections
+    import itertools
     import pandas as pd
     import sys
 
@@ -316,16 +367,28 @@ if __name__ == '__main__':
     counts = csv2analyse(csv, args.score, args.metric, args.minseq, args.maxseq, args.mrdelta, \
                          args.maintain, args.deltaby, combs)   # Original combination: same bucket, aligner and/or family, but different tree
                         #order=tmp, bucket=bucket, aligner=aligner, family=family, tree=tree)   # Original combination: same bucket, aligner and/or family, but different tree
+
     # Summarize counts
     csvs = {}
-    csvs["_".join(args.maintain)] = get_csv_allcomb_fixed(counts, args.reverse, args.maintain, args.deltaby)
+    csvs["_".join(args.maintain)] = get_ratio(counts, args.reverse, args.maintain, args.deltaby)
+    d = {'base' : {'mrdelta':args.mrdelta, 'score':args.score, 'metric':args.metric} }
+    d["_".join(args.maintain)] = {**d['base'], **{'between': args.deltaby}}
     for i in range(1, len(args.maintain)):
-        maint = args.maintain[:-i]
-        csvs["_".join(maint)] = get_ratio(counts, args.reverse, maint, args.deltaby)
+        iter_comb = itertools.combinations(args.maintain, i)  # All possible combinations to stratify analysis
+        for j in iter_comb:
+            maint = list(j)
+            fixed = [x for x in args.maintain if x not in maint ]
+            csvs["_".join(maint)] = get_ratio(counts, args.reverse, maint, args.deltaby)
+            tmp = dict(zip(fixed, ['global']*len(fixed) ))
+            d["_".join(maint)] = {**d["_".join(args.maintain)], **tmp}
+    csvs["global"] = get_global_ratio(counts, args.reverse, args.deltaby)
+    d["global"] = {**d["_".join(args.maintain)], **dict(zip(args.maintain, ['global']*len(args.maintain) ))}
 
-    # Print output
-    counts.round(args.decimal).to_csv(args.outdir+"/"+args.score+"_"+args.metric+"_counts.tsv", sep="\t", index=False)
+    # Add mrdelta, score, metric and other columns, reorder & print output
+    counts = add_columns(counts, d['base'], args.maintain, args.reverse, "counts")
+    counts.round(args.decimal).to_csv(args.outdir+"/"+args.score+"_"+args.metric+"_counts.tsv", sep="\t", index=False, na_rep='NA')
     for element in csvs:
+        csvs[element] = add_columns(csvs[element], d[element], args.maintain, args.reverse, None)
         csvs[element].round(args.decimal).to_csv(args.outdir + "/" + \
             args.score + "_" + args.metric + "_" + element + ".tsv", 
-            sep="\t", index=False)
+            sep="\t", index=False, na_rep='NA')
