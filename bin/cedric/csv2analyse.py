@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Python 3.7
+# Python 3.7.2
 
 
 __description__ = '''
@@ -11,7 +11,7 @@ Python version of the Cedric's script for the analysis of homoplasy.
 
 
 
-def csv2analyse(df, score, metric, minseq, maxseq, mrdelta, maintain, deltaby, combs):
+def csv2analyse(df, score, metric, minseq, maxseq, mrdelta, reverse, maintain, deltaby, combs):
     '''
     Count homoplasy output
     
@@ -45,7 +45,7 @@ def csv2analyse(df, score, metric, minseq, maxseq, mrdelta, maintain, deltaby, c
         delta = compute_delta(comb, score, metric)
         delta = filter_delta(delta, mrdelta)
         c["unused"] = c["total"] - delta.shape[0]  # Number of deltas filtered out
-        c["ndeltaN"], c["ndeltaP"], c["minScore"], c["minNumb"], c["maxScore"], c["maxNumb"] = count_statistics(delta)
+        c["ndeltaN"], c["ndeltaP"], c["minScore"], c["minNumb"], c["maxScore"], c["maxNumb"] = count_statistics(delta, reverse)
 
         # Merge info to dataframe
         # array_names = np.array([names + [deltaby]]).reshape(-1, 4)
@@ -163,11 +163,12 @@ def compute_delta(comb, score, metric):
     return(delta)
 
 
-def count_statistics(delta):
+def count_statistics(delta, reverse):
     ''' 
     Input
     -----
-    delta : pandas dataframe with the information of the deltas.
+    delta    : pandas dataframe with the information of the deltas.
+    reverse  : if reverse, then positive correlation instead of negative
 
     Output
     ------
@@ -180,35 +181,66 @@ def count_statistics(delta):
 
     '''
 
-    # Negative correlation between score-metric (the interesting ones)
-    # +-, -+
-    cond = ((delta.delta_score > 0) & (delta.delta_metric < 0)) | ((delta.delta_score < 0) & (delta.delta_metric > 0))
-    ndeltaN = delta[cond].shape[0]
+    if reverse:
+        # Positive correlation between score-metric (the interesting ones)
+        # ++, --
+        cond = ((delta.delta_score > 0) & (delta.delta_metric > 0)) | ((delta.delta_score < 0) & (delta.delta_metric < 0))
+        ndeltaP = delta[cond].shape[0]
 
-    # Non-negative correlation between score-metric
-    # Include positive correlation: ++, --
-    # And also: +0, 0+, -0, 0-. That is to say, if delta-score increases or decreases, the delta-metric is 0, and viceversa
-    # Note here that the 0,0 points are already removed in the filtering step
-    cond = ((delta.delta_score >= 0) & (delta.delta_metric >= 0)) | ((delta.delta_score <= 0) & (delta.delta_metric <= 0))
-    ndeltaP = delta[cond].shape[0]
+        # Non-positive correlation between score-metric
+        # Include negative correlation: +-, -+
+        # And others
+        cond = ((delta.delta_score >= 0) & (delta.delta_metric <= 0)) | ((delta.delta_score <= 0) & (delta.delta_metric >= 0))
+        ndeltaN = delta[cond].shape[0]
 
-    # Score if wrong/good alignment (according to metric) is always chosen
-    minScore, maxScore = 0.0, 0.0
-    minNumb, maxNumb = 0, 0
-    cond1 = delta.metric1 >  delta.metric2
-    cond2 = delta.metric1 <= delta.metric2
-    df1 = delta[cond1] 
-    df2 = delta[cond2]
-    # Wrong alignment according to metric
-    minScore += df1.score1.sum()
-    minScore += df2.score2.sum()
-    minNumb += df1.shape[0]
-    minNumb += df2.shape[0]
-    # Good alignment according to metric
-    maxScore += df1.score2.sum()
-    maxScore += df2.score1.sum()
-    maxNumb += df1.shape[0]
-    maxNumb += df2.shape[0]
+        # Score if wrong/good alignment (according to metric) is always chosen
+        minScore, maxScore = 0.0, 0.0
+        minNumb, maxNumb = 0, 0
+        cond1 = delta.metric1 <  delta.metric2
+        cond2 = delta.metric1 >= delta.metric2  # So the equal values will be added as wrong and good alignments (50/50)
+        df1 = delta[cond1] 
+        df2 = delta[cond2]
+        # Wrong alignment according to metric
+        minScore += df1.score1.sum()
+        minScore += df2.score2.sum()
+        minNumb += df1.shape[0]
+        minNumb += df2.shape[0]
+        # Good alignment according to metric
+        maxScore += df1.score2.sum()
+        maxScore += df2.score1.sum()
+        maxNumb += df1.shape[0]
+        maxNumb += df2.shape[0]
+
+    else:
+        # Negative correlation between score-metric (the interesting ones)
+        # +-, -+
+        cond = ((delta.delta_score > 0) & (delta.delta_metric < 0)) | ((delta.delta_score < 0) & (delta.delta_metric > 0))
+        ndeltaN = delta[cond].shape[0]
+
+        # Non-negative correlation between score-metric
+        # Include positive correlation: ++, --
+        # And also: +0, 0+, -0, 0-. That is to say, if delta-score increases or decreases, the delta-metric is 0, and viceversa
+        # Note here that the 0,0 points are already removed in the filtering step
+        cond = ((delta.delta_score >= 0) & (delta.delta_metric >= 0)) | ((delta.delta_score <= 0) & (delta.delta_metric <= 0))
+        ndeltaP = delta[cond].shape[0]
+
+        # Score if wrong/good alignment (according to metric) is always chosen
+        minScore, maxScore = 0.0, 0.0
+        minNumb, maxNumb = 0, 0
+        cond1 = delta.metric1 >  delta.metric2
+        cond2 = delta.metric1 <= delta.metric2   # So the equal values will be added as wrong and good alignments (50/50)
+        df1 = delta[cond1] 
+        df2 = delta[cond2]
+        # Wrong alignment according to metric
+        minScore += df1.score1.sum()
+        minScore += df2.score2.sum()
+        minNumb += df1.shape[0]
+        minNumb += df2.shape[0]
+        # Good alignment according to metric
+        maxScore += df1.score2.sum()
+        maxScore += df2.score1.sum()
+        maxNumb += df1.shape[0]
+        maxNumb += df2.shape[0]
     
     return(ndeltaN, ndeltaP, minScore, minNumb, maxScore, maxNumb)
 
@@ -230,20 +262,6 @@ def calculate_ratio(df, reverse):
         d["Nratio"] = df["ndeltaN"] / usedNumber
 
     return(d)
-
-
-# def get_csv_allcomb_fixed(df, reverse, maintain):
-
-#     import numpy as np
-#     import pandas as pd
-
-#     d = calculate_ratio(df, reverse)
-
-#     tmp1 = df[maintain]
-#     tmp2 = pd.DataFrame(d)
-#     df2 = pd.concat( [tmp1, tmp2], axis=1)
-    
-#     return(df2)
 
 
 def get_ratio(df, reverse, maintain, deltaby):
@@ -333,8 +351,8 @@ if __name__ == '__main__':
 
     app = argparse.ArgumentParser(description=__description__)
     app.add_argument("-csv", type=str, required=True, help=".csv filename")
-    app.add_argument("-score", type=str, required=True, choices=["tc","sp","col"])
-    app.add_argument("-metric", type=str, required=True, choices=["homo","whomo","whomo2","ngap","ngap2"])
+    app.add_argument("-score", type=str, required=True)#, choices=["tc","sp","col"])
+    app.add_argument("-metric", type=str, required=True)#, choices=["homo","whomo","whomo2","len","ngap","ngap2"])
     app.add_argument("-norm", type=str, choices=["PerLen","PerSeq","PerLenSeq","ByLen","BySeq","ByLenSeq"], default=None, \
                     help="Data normalization. Divided by length, number of sequence, or both. \
                     Or multiplied by Length, number of sequence, or both.")
@@ -364,7 +382,7 @@ if __name__ == '__main__':
     # Analyze
     # Get counts
     tmp = args.maintain + [args.deltaby]
-    counts = csv2analyse(csv, args.score, args.metric, args.minseq, args.maxseq, args.mrdelta, \
+    counts = csv2analyse(csv, args.score, args.metric, args.minseq, args.maxseq, args.mrdelta, args.reverse, \
                          args.maintain, args.deltaby, combs)   # Original combination: same bucket, aligner and/or family, but different tree
                         #order=tmp, bucket=bucket, aligner=aligner, family=family, tree=tree)   # Original combination: same bucket, aligner and/or family, but different tree
 
@@ -386,9 +404,10 @@ if __name__ == '__main__':
 
     # Add mrdelta, score, metric and other columns, reorder & print output
     counts = add_columns(counts, d['base'], args.maintain, args.reverse, "counts")
-    counts.round(args.decimal).to_csv(args.outdir+"/"+args.score+"_"+args.metric+"_counts.tsv", sep="\t", index=False, na_rep='NA')
+    counts.round(args.decimal).to_csv(args.outdir + "/" + args.score + "_" + args.metric + "_mrdelta" + str(args.mrdelta) + "_counts.tsv", \
+                                        sep="\t", index=False, na_rep='NA')
     for element in csvs:
         csvs[element] = add_columns(csvs[element], d[element], args.maintain, args.reverse, None)
         csvs[element].round(args.decimal).to_csv(args.outdir + "/" + \
-            args.score + "_" + args.metric + "_" + element + ".tsv", 
+            args.score + "_" + args.metric + "_mrdelta" + str(args.mrdelta) + "_" + element + ".tsv", 
             sep="\t", index=False, na_rep='NA')
