@@ -11,7 +11,7 @@ Python version of the Cedric's script for the analysis of homoplasy.
 
 
 
-def csv2analyse(df, score, metric, minseq, maxseq, mrdelta, reverse, maintain, deltaby, combs):
+def csv2analyse(df, score, metric, minseq, maxseq, mrdelta, reverse, norm, maintain, deltaby, combs):
     '''
     Count homoplasy output
     
@@ -42,7 +42,7 @@ def csv2analyse(df, score, metric, minseq, maxseq, mrdelta, reverse, maintain, d
         comb  = filter_unused(comb, minseq, maxseq)  
         if comb.shape == 0:
             continue
-        delta = compute_delta(comb, score, metric)
+        delta = compute_delta(comb, score, metric, norm)
         delta = filter_delta(delta, mrdelta)
         c["unused"] = c["total"] - delta.shape[0]  # Number of deltas filtered out
         c["ndeltaN"], c["ndeltaP"], c["minScore"], c["minNumb"], c["maxScore"], c["maxNumb"] = count_statistics(delta, reverse)
@@ -109,7 +109,7 @@ def filter_delta(delta, mrdelta):
     return(delta)
 
                         
-def compute_delta(comb, score, metric):
+def compute_delta(comb, score, metric, norm):
     ''' Compute delta-score and delta-metric.
     
     Input
@@ -130,7 +130,12 @@ def compute_delta(comb, score, metric):
     # Initialize
     delta = pd.DataFrame(columns=["score1", "score2", "metric1", "metric2"])
 
-    vals = { "score" : comb[score].tolist(), "metric": comb[metric].tolist() } # Get values from columns 'score' and 'metric'
+    # Get score & metric values
+    if norm:
+        vals = { "score" : comb[score].tolist(), "metric": (comb[metric]/comb['nseq']/comb['len']).tolist() } 
+    else:
+        vals = { "score" : comb[score].tolist(), "metric": comb[metric].tolist() } # Get values from columns 'score' and 'metric'
+
     for i in range( len(vals["score"]) ):  # For each row
 
         # Get score1 and score2
@@ -353,9 +358,8 @@ if __name__ == '__main__':
     app.add_argument("-csv", type=str, required=True, help=".csv filename")
     app.add_argument("-score", type=str, required=True)#, choices=["tc","sp","col"])
     app.add_argument("-metric", type=str, required=True)#, choices=["homo","whomo","whomo2","len","ngap","ngap2"])
-    app.add_argument("-norm", type=str, choices=["PerLen","PerSeq","PerLenSeq","ByLen","BySeq","ByLenSeq"], default=None, \
-                    help="Data normalization. Divided by length, number of sequence, or both. \
-                    Or multiplied by Length, number of sequence, or both.")
+    app.add_argument("-norm", action='store_true', default=None, \
+                    help="Data normalization. Divide metric by length and number of sequence.")
     app.add_argument("-mrdelta", type=float, default=0.0)
     app.add_argument("-minseq", type=int, default=0)
     app.add_argument("-maxseq", type=int, default=100000)
@@ -382,7 +386,7 @@ if __name__ == '__main__':
     # Analyze
     # Get counts
     tmp = args.maintain + [args.deltaby]
-    counts = csv2analyse(csv, args.score, args.metric, args.minseq, args.maxseq, args.mrdelta, args.reverse, \
+    counts = csv2analyse(csv, args.score, args.metric, args.minseq, args.maxseq, args.mrdelta, args.reverse, args.norm, \
                          args.maintain, args.deltaby, combs)   # Original combination: same bucket, aligner and/or family, but different tree
                         #order=tmp, bucket=bucket, aligner=aligner, family=family, tree=tree)   # Original combination: same bucket, aligner and/or family, but different tree
 
