@@ -11,7 +11,7 @@ Python version of the Cedric's script for the analysis of homoplasy.
 
 
 
-def csv2analyse(df, score, metric, minseq, maxseq, mrdelta, reverse, norm, maintain, deltaby, combs):
+def csv2analyse(df, score, metric, minseq, maxseq, mrdelta, norm, corr, maintain, deltaby, combs):
     '''
     Count homoplasy output
     
@@ -21,14 +21,16 @@ def csv2analyse(df, score, metric, minseq, maxseq, mrdelta, reverse, norm, maint
     import numpy as np
     import pandas as pd
 
+    # Normalize if required
+    if norm:
+        df[metric] = df[metric].div(df.nseq, axis = 0).div(df.len, axis = 0)
+
     # Initialize counts
-    namecounts = ["total", "unused", "ndeltaN", "ndeltaP", "minScore", "minNumb", "maxScore", "maxNumb"]
+    namecounts = ["total", "unused", "ndeltaN", "ndeltaP", "ndeltaO", "minScore", "minNumb", "maxScore", "maxNumb"]
     cols = maintain + ["between"] + namecounts
     counts = pd.DataFrame(columns=cols)
 
-    # Group by keys[0:2]
-    # If key[3]==tree, then we will have a list of combinations with same bucket, aligner, family, but different tree
-    # So that we can compute delta for tree1 and tree2 --> function compute_delta
+    # Group data frame
     index = 0
     g = list(csv.groupby(maintain))  
     for element in g: 
@@ -42,16 +44,12 @@ def csv2analyse(df, score, metric, minseq, maxseq, mrdelta, reverse, norm, maint
         comb  = filter_unused(comb, minseq, maxseq)  
         if comb.shape == 0:
             continue
-        delta = compute_delta(comb, score, metric, norm)
+        delta = compute_delta(comb, score, metric)
         delta = filter_delta(delta, mrdelta)
         c["unused"] = c["total"] - delta.shape[0]  # Number of deltas filtered out
-        c["ndeltaN"], c["ndeltaP"], c["minScore"], c["minNumb"], c["maxScore"], c["maxNumb"] = count_statistics(delta, reverse)
+        c["ndeltaN"], c["ndeltaP"], c["ndeltaO"], c["minScore"], c["minNumb"], c["maxScore"], c["maxNumb"] = count_statistics(delta)
 
         # Merge info to dataframe
-        # array_names = np.array([names + [deltaby]]).reshape(-1, 4)
-        # array_counts = np.array([ntot, unused, ndeltaN, ndeltaP, \
-        #                 minScore, minNumb, maxScore, maxNumb]).reshape(-1, 8)
-        # tmp = pd.concat( [pd.DataFrame(array_names, columns=cols[0:4]), pd.DataFrame(array_counts, columns=cols[4:])], axis=1 )
         tmp = pd.DataFrame(c, index=[index])
         counts = pd.concat( [counts,tmp] )
         index += 1
@@ -62,7 +60,19 @@ def csv2analyse(df, score, metric, minseq, maxseq, mrdelta, reverse, norm, maint
         c['bucket'] = 'int32'
     counts = counts.astype(c, errors='ignore', copy=False)
 
-    return(counts)
+    # Set correct correlation: positive or negative
+    if corr:
+        correlation = corr
+    else:
+        if counts['ndeltaP'].sum() > counts['ndeltaN'].sum():
+            correlation = 'positive'
+        else:
+            correlation = 'negative'
+            tmp = {'minScore':'maxScore', 'maxScore':'minScore', \
+                'minNumb' :'maxNumb' , 'maxNumb' :'minNumb'}
+            counts = counts.rename(columns=tmp)
+
+    return(counts, correlation)
         
 
 def filter_unused(df, minseq, maxseq):
@@ -109,7 +119,7 @@ def filter_delta(delta, mrdelta):
     return(delta)
 
                         
-def compute_delta(comb, score, metric, norm):
+def compute_delta(comb, score, metric):
     ''' Compute delta-score and delta-metric.
     
     Input
@@ -130,12 +140,7 @@ def compute_delta(comb, score, metric, norm):
     # Initialize
     delta = pd.DataFrame(columns=["score1", "score2", "metric1", "metric2"])
 
-    # Get score & metric values
-    if norm:
-        vals = { "score" : comb[score].tolist(), "metric": (comb[metric]/comb['nseq']/comb['len']).tolist() } 
-    else:
-        vals = { "score" : comb[score].tolist(), "metric": comb[metric].tolist() } # Get values from columns 'score' and 'metric'
-
+    vals = { "score" : comb[score].tolist(), "metric": comb[metric].tolist() } # Get values from columns 'score' and 'metric'
     for i in range( len(vals["score"]) ):  # For each row
 
         # Get score1 and score2
@@ -168,17 +173,17 @@ def compute_delta(comb, score, metric, norm):
     return(delta)
 
 
-def count_statistics(delta, reverse):
+def count_statistics(delta):
     ''' 
     Input
     -----
     delta    : pandas dataframe with the information of the deltas.
-    reverse  : if reverse, then positive correlation instead of negative
 
     Output
     ------
-    ndeltaN  : number of deltas (score & metric) in negative correlation
-    ndeltaP  : number of deltas not in negative correlation
+    ndeltaN  : number of deltas in negative correlation
+    ndeltaP  : number of deltas in positive correlation
+    ndeltaO  : number of deltas not in negative nor positive correlation
     minScore : sum of score if wrong alignment (according to metric) is always chosen
     minNumb  : counts of wrong alignment considered
     maxScore : sum of score if good alignment (according to metric) is always chosen
@@ -186,71 +191,43 @@ def count_statistics(delta, reverse):
 
     '''
 
-    if reverse:
-        # Positive correlation between score-metric (the interesting ones)
-        # ++, --
-        cond = ((delta.delta_score > 0) & (delta.delta_metric > 0)) | ((delta.delta_score < 0) & (delta.delta_metric < 0))
-        ndeltaP = delta[cond].shape[0]
+    # Positive correlation between score-metric (the interesting ones)
+    # ++, --
+    cond = ((delta.delta_score > 0) & (delta.delta_metric > 0)) | ((delta.delta_score < 0) & (delta.delta_metric < 0))
+    ndeltaP = delta[cond].shape[0]
 
-        # Non-positive correlation between score-metric
-        # Include negative correlation: +-, -+
-        # And others
-        cond = ((delta.delta_score >= 0) & (delta.delta_metric <= 0)) | ((delta.delta_score <= 0) & (delta.delta_metric >= 0))
-        ndeltaN = delta[cond].shape[0]
+    # Negative correlation between score-metric
+    # +-, -+
+    cond = ((delta.delta_score > 0) & (delta.delta_metric < 0)) | ((delta.delta_score < 0) & (delta.delta_metric > 0))
+    ndeltaN = delta[cond].shape[0]
 
-        # Score if wrong/good alignment (according to metric) is always chosen
-        minScore, maxScore = 0.0, 0.0
-        minNumb, maxNumb = 0, 0
-        cond1 = delta.metric1 <  delta.metric2
-        cond2 = delta.metric1 >= delta.metric2  # So the equal values will be added as wrong and good alignments (50/50)
-        df1 = delta[cond1] 
-        df2 = delta[cond2]
-        # Wrong alignment according to metric
-        minScore += df1.score1.sum()
-        minScore += df2.score2.sum()
-        minNumb += df1.shape[0]
-        minNumb += df2.shape[0]
-        # Good alignment according to metric
-        maxScore += df1.score2.sum()
-        maxScore += df2.score1.sum()
-        maxNumb += df1.shape[0]
-        maxNumb += df2.shape[0]
+    # Other correlation
+    cond = ((delta.delta_score == 0) & (delta.delta_metric != 0)) | ((delta.delta_score != 0) & (delta.delta_metric == 0)) 
+    ndeltaO = delta[cond].shape[0]
 
-    else:
-        # Negative correlation between score-metric (the interesting ones)
-        # +-, -+
-        cond = ((delta.delta_score > 0) & (delta.delta_metric < 0)) | ((delta.delta_score < 0) & (delta.delta_metric > 0))
-        ndeltaN = delta[cond].shape[0]
+    # Score if wrong/good alignment (according to metric) is always chosen
+    # Supposing positive correlation (otherwise, they will be changed afterwards)
+    minScore, maxScore = 0.0, 0.0
+    minNumb, maxNumb = 0, 0
+    cond1 = delta.metric1 <  delta.metric2
+    cond2 = delta.metric1 >= delta.metric2  # So the equal values will be added as wrong and good alignments (50/50)
+    df1 = delta[cond1] 
+    df2 = delta[cond2]
+    # Wrong alignment according to metric
+    minScore += df1.score1.sum()
+    minScore += df2.score2.sum()
+    minNumb += df1.shape[0]
+    minNumb += df2.shape[0]
+    # Good alignment according to metric
+    maxScore += df1.score2.sum()
+    maxScore += df2.score1.sum()
+    maxNumb += df1.shape[0]
+    maxNumb += df2.shape[0]
 
-        # Non-negative correlation between score-metric
-        # Include positive correlation: ++, --
-        # And also: +0, 0+, -0, 0-. That is to say, if delta-score increases or decreases, the delta-metric is 0, and viceversa
-        # Note here that the 0,0 points are already removed in the filtering step
-        cond = ((delta.delta_score >= 0) & (delta.delta_metric >= 0)) | ((delta.delta_score <= 0) & (delta.delta_metric <= 0))
-        ndeltaP = delta[cond].shape[0]
-
-        # Score if wrong/good alignment (according to metric) is always chosen
-        minScore, maxScore = 0.0, 0.0
-        minNumb, maxNumb = 0, 0
-        cond1 = delta.metric1 >  delta.metric2
-        cond2 = delta.metric1 <= delta.metric2   # So the equal values will be added as wrong and good alignments (50/50)
-        df1 = delta[cond1] 
-        df2 = delta[cond2]
-        # Wrong alignment according to metric
-        minScore += df1.score1.sum()
-        minScore += df2.score2.sum()
-        minNumb += df1.shape[0]
-        minNumb += df2.shape[0]
-        # Good alignment according to metric
-        maxScore += df1.score2.sum()
-        maxScore += df2.score1.sum()
-        maxNumb += df1.shape[0]
-        maxNumb += df2.shape[0]
-    
-    return(ndeltaN, ndeltaP, minScore, minNumb, maxScore, maxNumb)
+    return(ndeltaN, ndeltaP, ndeltaO, minScore, minNumb, maxScore, maxNumb)
 
 
-def calculate_ratio(df, reverse):
+def calculate_ratio(df, correlation):
 
     d = {}
 
@@ -261,15 +238,15 @@ def calculate_ratio(df, reverse):
     d["minacc"] = df["minScore"] / df["minNumb"]
     d["maxacc"] = df["maxScore"] / df["maxNumb"]
     d["deltaacc"] = d["maxacc"] - d["minacc"]
-    if reverse:
-        d["Pratio"] = df["ndeltaP"] / usedNumber
+    if correlation == 'positive':
+        d["Ratio"] = df["ndeltaP"] / usedNumber
     else:
-        d["Nratio"] = df["ndeltaN"] / usedNumber
+        d["Ratio"] = df["ndeltaN"] / usedNumber
 
     return(d)
 
 
-def get_ratio(df, reverse, maintain, deltaby):
+def get_ratio(df, correlation, maintain, deltaby):
 
     import numpy as np
     import pandas as pd
@@ -282,7 +259,7 @@ def get_ratio(df, reverse, maintain, deltaby):
     df = g.sum().reset_index(level=lev)
 
     # Calculate ratio
-    d = calculate_ratio(df, reverse)
+    d = calculate_ratio(df, correlation)
     tmp1 = df[maintain]
     tmp2 = pd.DataFrame(d)
     df2 = pd.concat( [tmp1, tmp2], axis=1)
@@ -292,34 +269,39 @@ def get_ratio(df, reverse, maintain, deltaby):
     for element in g:
         comb = element[1]
         cond = comb.unused < comb.total
-        nfam.append( len(comb[cond]["family"].unique()) )
+        if deltaby != 'family':
+            nfam.append( len(comb[cond]["family"].unique()) )
+        else:
+            nfam.append( np.nan )
     df2["nfam"] = nfam
-
     return(df2)
 
 
-def get_global_ratio(df, reverse, deltaby):
+def get_global_ratio(df, correlation, deltaby):
 
     import numpy as np
     import pandas as pd
 
     # Parse df
-    namecounts = ["total", "unused", "ndeltaN", "ndeltaP", "minScore", "minNumb", "maxScore", "maxNumb"]
+    namecounts = ["total", "unused", "ndeltaN", "ndeltaP", "ndeltaO", "minScore", "minNumb", "maxScore", "maxNumb"]
     df2 = df[namecounts].sum()
 
     # Calculate
-    d = calculate_ratio(df2, reverse)
+    d = calculate_ratio(df2, correlation)
     df2 = pd.DataFrame(d, index=[0])
 
     # Determina nfam
     cond = df.unused < df.total
-    nfam = len(df[cond]["family"].unique())
+    if deltaby != 'family':
+        nfam = len(df[cond]["family"].unique())
+    else:
+        nfam = np.nan
     df2['nfam'] = nfam
 
     return(df2)
 
 
-def add_columns(df, add_d, maintain, reverse, typeCount):
+def add_columns(df, add_d, maintain, typeCount):
 
     n = df.shape[0]
 
@@ -333,12 +315,10 @@ def add_columns(df, add_d, maintain, reverse, typeCount):
     # Column names
     if typeCount == "counts":
         colcounts = ["total", "unused", "ndeltaN", "ndeltaP", "minScore", "minNumb", "maxScore", "maxNumb"]
+        cols = ["mrdelta", "score", "metric"] + maintain + ["between"] + colcounts
     else:
-        if reverse:
-            colcounts = ["Pratio", "unusedRatio", "nfam", "minacc", "maxacc", "deltaacc"]
-        else:
-            colcounts = ["Nratio", "unusedRatio", "nfam", "minacc", "maxacc", "deltaacc"]
-    cols = ["mrdelta", "score", "metric"] + maintain + ["between"] + colcounts
+        colcounts = ["Ratio", "unusedRatio", "nfam", "minacc", "maxacc", "deltaacc"]
+        cols = ["mrdelta", "score", "metric"] + maintain + ["between"] + ["correlation"] + colcounts
 
     # Reorder columns
     df = df[cols]
@@ -360,10 +340,10 @@ if __name__ == '__main__':
     app.add_argument("-metric", type=str, required=True)#, choices=["homo","whomo","whomo2","len","ngap","ngap2"])
     app.add_argument("-norm", action='store_true', default=None, \
                     help="Data normalization. Divide metric by length and number of sequence.")
+    app.add_argument('-corr', type=str, choices=['positive','negative'], default=None)
     app.add_argument("-mrdelta", type=float, default=0.0)
     app.add_argument("-minseq", type=int, default=0)
     app.add_argument("-maxseq", type=int, default=100000)
-    app.add_argument("-reverse", action='store_true', default=None, help="Pratio instead of Nratio")
     app.add_argument("-outdir", type=str, required=True, help="Output directory")
     app.add_argument("-decimal", type=int, default=3)
     app.add_argument("-maintain", type=str, nargs='+', default=["bucket","aligner","family"], \
@@ -373,9 +353,6 @@ if __name__ == '__main__':
 
     # Read homoplasy.csv 
     csv = pd.read_csv(args.csv, header=0)
-    # Normalize data if required
-    # if args.norm:
-    #     csv = normalize_csv(csv, args.norm)
 
     # Combinations: family, bucket, aligner, tree
     combs = {}
@@ -386,32 +363,32 @@ if __name__ == '__main__':
     # Analyze
     # Get counts
     tmp = args.maintain + [args.deltaby]
-    counts = csv2analyse(csv, args.score, args.metric, args.minseq, args.maxseq, args.mrdelta, args.reverse, args.norm, \
+    counts, correlation = csv2analyse(csv, args.score, args.metric, args.minseq, args.maxseq, args.mrdelta, args.norm, args.corr, \
                          args.maintain, args.deltaby, combs)   # Original combination: same bucket, aligner and/or family, but different tree
                         #order=tmp, bucket=bucket, aligner=aligner, family=family, tree=tree)   # Original combination: same bucket, aligner and/or family, but different tree
 
     # Summarize counts
     csvs = {}
-    csvs["_".join(args.maintain)] = get_ratio(counts, args.reverse, args.maintain, args.deltaby)
+    csvs["_".join(args.maintain)] = get_ratio(counts, correlation, args.maintain, args.deltaby)
     d = {'base' : {'mrdelta':args.mrdelta, 'score':args.score, 'metric':args.metric} }
-    d["_".join(args.maintain)] = {**d['base'], **{'between': args.deltaby}}
+    d["_".join(args.maintain)] = {**d['base'], **{'between': args.deltaby, 'correlation':correlation}}
     for i in range(1, len(args.maintain)):
         iter_comb = itertools.combinations(args.maintain, i)  # All possible combinations to stratify analysis
         for j in iter_comb:
             maint = list(j)
             fixed = [x for x in args.maintain if x not in maint ]
-            csvs["_".join(maint)] = get_ratio(counts, args.reverse, maint, args.deltaby)
+            csvs["_".join(maint)] = get_ratio(counts, correlation, maint, args.deltaby)
             tmp = dict(zip(fixed, ['global']*len(fixed) ))
             d["_".join(maint)] = {**d["_".join(args.maintain)], **tmp}
-    csvs["global"] = get_global_ratio(counts, args.reverse, args.deltaby)
+    csvs["global"] = get_global_ratio(counts, correlation, args.deltaby)
     d["global"] = {**d["_".join(args.maintain)], **dict(zip(args.maintain, ['global']*len(args.maintain) ))}
 
     # Add mrdelta, score, metric and other columns, reorder & print output
-    counts = add_columns(counts, d['base'], args.maintain, args.reverse, "counts")
+    counts = add_columns(counts, d['base'], args.maintain, "counts")
     counts.round(args.decimal).to_csv(args.outdir + "/" + args.score + "_" + args.metric + "_mrdelta" + str(args.mrdelta) + "_counts.tsv", \
                                         sep="\t", index=False, na_rep='NA')
     for element in csvs:
-        csvs[element] = add_columns(csvs[element], d[element], args.maintain, args.reverse, None)
+        csvs[element] = add_columns(csvs[element], d[element], args.maintain, None)
         csvs[element].round(args.decimal).to_csv(args.outdir + "/" + \
             args.score + "_" + args.metric + "_mrdelta" + str(args.mrdelta) + "_" + element + ".tsv", 
             sep="\t", index=False, na_rep='NA')
