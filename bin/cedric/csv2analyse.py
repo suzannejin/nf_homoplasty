@@ -68,6 +68,7 @@ def csv2analyse(df, score, metric, minseq, maxseq, mrdelta, norm, corr, maintain
             correlation = 'positive'
         else:
             correlation = 'negative'
+    if correlation == 'negative':  # Inverse if negative correlation
             tmp = {'minScore':'maxScore', 'maxScore':'minScore', \
                 'minNumb' :'maxNumb' , 'maxNumb' :'minNumb'}
             counts = counts.rename(columns=tmp)
