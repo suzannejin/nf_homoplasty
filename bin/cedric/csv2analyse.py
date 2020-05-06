@@ -139,7 +139,7 @@ def compute_delta(comb, score, metric):
     import pandas as pd
 
     # Initialize
-    delta = pd.DataFrame(columns=["score1", "score2", "metric1", "metric2"])
+    delta = pd.DataFrame(columns=["score1", "score2", "metric1", "metric2"], dtype='float64')
 
     vals = { "score" : comb[score].tolist(), "metric": comb[metric].tolist() } # Get values from columns 'score' and 'metric'
     for i in range( len(vals["score"]) ):  # For each row
@@ -169,8 +169,8 @@ def compute_delta(comb, score, metric):
     delta["delta_metric"] = delta.metric1 - delta.metric2
     
     # Compute mrdelta
-    delta["mrdelta"] = 2 * abs(delta.metric1 - delta.metric2) / (delta.metric1 + delta.metric2)
-
+    delta['mrdelta'] = 2 * abs(delta.metric1 - delta.metric2) / (delta.metric1 + delta.metric2)
+    
     return(delta)
 
 
