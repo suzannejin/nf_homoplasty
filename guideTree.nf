@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 
-// nextflow run fullTreeFFTNS1.nf -with-singularity
+// nextflow run fullTreeCO.nf -with-singularity
 // fullTreeCO.nf , fullTreeFFTNS1.nf, fullTreeSPARSE.nf, fullTreeUPP.nf, fullTreeGINSI.nf
 
 
@@ -37,8 +37,9 @@
 
 // input sequences to align in fasta format
 //params.seqs ="/users/cn/egarriga/datasets/homfam/combinedSeqs/seatoxin.fa"
-//params.seqs ="/users/cn/egarriga/datasets/homfam/combinedSeqs/*.fa"
-params.seqs ="/users/cn/egarriga/datasets/homfam/combinedSeqs/rvp.fa"
+//params.seqs ="/users/cn/egarriga/datasets/homfam/combinedSeqs/{rvp,zf-CCHH}.fa"
+params.seqs ="/users/cn/egarriga/datasets/homfam/combinedSeqs/zf-CCHH.fa"
+
 
 
 // input reference sequences aligned in 
@@ -47,23 +48,25 @@ params.refs = "/users/cn/egarriga/datasets/homfam/refs/*"
 
 // input guide trees in Newick format. Or `false` to generate trees
 //params.trees ="/users/cn/egarriga/nf_homoplasy/results_tree/guide_trees/seatoxin.*{codnd,dpparttreednd1,dpparttreednd2}.dnd"
-//params.trees ="/users/cn/sjin/projects/homoplasy/trees/*.{codnd,dpparttreednd1,dpparttreednd2,dpparttreednd2size,fastaparttreednd,fftns1dnd,fftns1dndmem,fftns2dnd,fftns2dndmem,mafftdnd,parttreednd0,parttreednd1,parttreednd2,parttreednd2size,FAMSA,CLUSTALO-RANDOM}.dnd"
-//params.trees ="/users/cn/sjin/projects/homoplasy/trees/*.dpparttreednd0.dnd"
-params.trees="/users/cn/sjin/projects/homoplasy/trees/*.{mafftdnd,fftns1dnd,fftns2dnd}.dnd"
+//params.trees ="/users/cn/egarriga/nf_homoplasy/results_tree/guide_trees/*.{codnd,dpparttreednd1,dpparttreednd2,dpparttreednd2size,fastaparttreednd,fftns1dnd,fftns1dndmem,fftns2dnd,fftns2dndmem,mafftdnd,parttreednd0,parttreednd1,parttreednd2,parttreednd2size}.dnd"
+//params.trees="/users/cn/sjin/projects/homoplasy/trees/*.{codnd,dpparttreednd1,dpparttreednd2,dpparttreednd2size,fastaparttreednd,fftns1dnd,fftns1dndmem,fftns2dnd,fftns2dndmem,mafftdnd,parttreednd0,parttreednd1,parttreednd2,parttreednd2size,FAMSA,CLUSTALO-RANDOM}.dnd"
+//params.trees="/users/cn/sjin/projects/homoplasy/trees/*.dpparttreednd0.dnd"
 
 
-// params.trees = false
+
+params.trees = false
 
 
 // which alignment methods to run
-params.align_method = "MAFFT-FFTNS1" //CLUSTALO,MAFFT-FFTNS1,MAFFT-SPARSECORE,UPP,MAFFT-GINSI"
+params.align_method = "CLUSTALO" //CLUSTALO,MAFFT-FFTNS1,MAFFT-SPARSECORE,UPP,MAFFT-GINSI"
 
 
 // which tree methods to run if `trees` == `false`
-params.tree_method = "CLUSTALO" 
+//params.tree_method = "CLUSTALO" 
+params.tree_method="fftns2dndmem"
 
 // generate regressive alignments ?
-params.regressive_align = true
+params.regressive_align = false
 
 // create standard alignments ?
 params.standard_align = false
@@ -72,14 +75,15 @@ params.standard_align = false
 params.default_align = false
 
 // evaluate alignments ?
-params.evaluate = true
+params.evaluate = false
 
 // bucket sizes for regressive algorithm
 params.buckets= '1000'
 
 // output directory
-//params.output = "$baseDir/test_seatoxin_FFTNS1"
-params.output = "$baseDir/results_fullTree_FFTNS1_bucket${params.buckets}"
+//params.output = "$baseDir/test_seatoxin_CO_2"
+params.output = "$baseDir/guide_tree"
+
 
 
 log.info """\
@@ -223,6 +227,7 @@ process regressive_alignment {
         val("dpa_align"), \
         val(bucket_size), \
         file("*.aln"), \
+        file("*.test"), \
         file("*.homoplasy"), \
         file("*.homo"), \
         file("*.w_homo"), \

@@ -1,6 +1,15 @@
 *.nfs*
+bin/jupyter/
 work/
-results/
+results*/
+data/
+excels/
+plots/
+guide_tree/
+test*/
+test*
+*.csv
+*.png
 .nextflow*
 report*
 trace*

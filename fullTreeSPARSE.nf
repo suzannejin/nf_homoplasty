@@ -36,8 +36,10 @@
  */
 
 // input sequences to align in fasta format
-params.seqs ="/users/cn/egarriga/datasets/homfam/combinedSeqs/seatoxin.fa"
-//params.seqs ="/users/cn/egarriga/datasets/homfam/bigger1000/*.fa"
+//params.seqs ="/users/cn/egarriga/datasets/homfam/combinedSeqs/seatoxin.fa"
+//params.seqs ="/users/cn/egarriga/datasets/homfam/combinedSeqs/{HMG_box,OTCace,msb,icd,proteasome,cyclo,LIM,HLH,ldh,subt,int,lyase_1,gpdh,egf,blm,gluts,myb_DNA-binding,tRNA-synt_2b,biotin_lipoyl,hom,ghf13,aldosered,hla,Rhodanese,PDZ,blmb,rhv,p450,adh,aat,rrm,Acetyltransf,sdr,zf-CCHH,rvp}.fa"
+//params.seqs = "/users/cn/egarriga/datasets/homfam/combinedSeqs/*.fa"
+params.seqs ="/users/cn/egarriga/datasets/homfam/combinedSeqs/rvp.fa"
 
 
 // input reference sequences aligned in 
@@ -45,9 +47,11 @@ params.refs = "/users/cn/egarriga/datasets/homfam/refs/*"
 
 
 // input guide trees in Newick format. Or `false` to generate trees
-//params.trees ="/users/cn/egarriga/nf_homoplasy/results_tree/guide_trees/seatoxin.*{codnd,dpparttreednd1,dpparttreednd2}.dnd"
-
-params.trees ="/users/cn/egarriga/nf_homoplasy/results_tree/guide_trees/*.{codnd,dpparttreednd1,dpparttreednd2,dpparttreednd2size,fastaparttreednd,fftns1dnd,fftns1dndmem,fftns2dnd,fftns2dndmem,mafftdnd,parttreednd0,parttreednd1,parttreednd2,parttreednd2size}.dnd"
+//params.trees ="/users/cn/sjin/projects/homoplasy/trees/*.{codnd,dpparttreednd1,dpparttreednd2}.dnd"
+//params.trees ="/users/cn/egarriga/nf_homoplasy/results_tree/guide_trees/*.{codnd,dpparttreednd1,dpparttreednd2,dpparttreednd2size,fastaparttreednd,fftns1dnd,fftns1dndmem,fftns2dnd,fftns2dndmem,mafftdnd,parttreednd0,parttreednd1,parttreednd2,parttreednd2size}.dnd"
+//params.trees="/users/cn/sjin/projects/homoplasy/trees/*.{codnd,dpparttreednd1,dpparttreednd2,dpparttreednd2size,fastaparttreednd,fftns1dnd,fftns1dndmem,fftns2dnd,fftns2dndmem,mafftdnd,parttreednd0,parttreednd1,parttreednd2,parttreednd2size,FAMSA,CLUSTALO-RANDOM}.dnd"
+//params.trees = "/users/cn/sjin/projects/homoplasy/trees/*.dpparttreednd0.dnd"
+params.trees="/users/cn/sjin/projects/homoplasy/trees/*.{mafftdnd,fftns1dnd,fftns2dnd}.dnd"
 
 
 // params.trees = false
@@ -76,8 +80,9 @@ params.evaluate = true
 params.buckets= '1000'
 
 // output directory
-params.output = "$baseDir/test_seatoxin_SPARSE_2"
-//params.output = "$baseDir/results_fullTree_SPARSE"
+//params.output="$baseDir/test_params"
+//params.output = "$baseDir/test_seatoxin_SPARSE_2"
+params.output = "$baseDir/results_fullTree_SPARSE_bucket${params.buckets}"
 
 
 log.info """\

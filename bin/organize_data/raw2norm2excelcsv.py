@@ -5,7 +5,7 @@ import pandas as pd
 
 bucket=sys.argv[1]  # Bucket size: 100, 1000, etc
 datatyp=sys.argv[2]   # "raw" | "delta"
-folder="data/"+datatyp+"/bucket"+bucket  # Where (homo,whomo,whomo2,ngap,ngap2,tc,sp).csv files are stored
+folder="data/"+datatyp+"/bucket"+str(bucket)  # Where (homo,whomo,whomo2,ngap,ngap2,tc,sp).csv files are stored
 excelfolder="excels/"  # Output will be stored here
 
 # Metrics
@@ -26,12 +26,12 @@ csvdic["whomo2"]=pd.read_csv(folder+"/whomo2.csv",header=[0,1],index_col=0)
 csvdic["ngap"]=pd.read_csv(folder+"/ngap.csv",header=[0,1],index_col=0)
 csvdic["ngap2"]=pd.read_csv(folder+"/ngap2.csv",header=[0,1],index_col=0)
 
-# Create nseq df
-tmp=csvdic["tc"].copy()
-n=tmp.shape[1]
-for i in range(1,n):
-    tmp[[i]]=tmp.iloc[:,0]
-csvdic["nseq"]=tmp
+# # Create nseq df
+# tmp=csvdic["tc"].copy()
+# n=tmp.shape[1]
+# for i in range(1,n):
+#     tmp[[i]]=tmp.iloc[:,0]
+# csvdic["nseq"]=tmp
 
 
 # Normalize data: per len & by len
@@ -53,52 +53,52 @@ for i in scores+otherparam:
     csvdic_normByLen[i]=csvdic[i]
     
 
-# Normalize data: per nseq & by nseq
-csvdic_normPerSeq={}
-csvdic_normBySeq={}
-for i in metrics:
-    csv=csvdic[i]
-    nseq=csvdic["nseq"]
-    # Per nseq
-    tmp=csv/nseq
-    tmp["nseq"]=csv["nseq"]
-    csvdic_normPerSeq[i]=tmp
-    # By nseq
-    tmp=csv*nseq
-    tmp["nseq"]=csv["nseq"]
-    csvdic_normBySeq[i]=tmp
-for i in scores+otherparam:
-    csvdic_normPerSeq[i]=csvdic[i]
-    csvdic_normBySeq[i]=csvdic[i]
+# # Normalize data: per nseq & by nseq
+# csvdic_normPerSeq={}
+# csvdic_normBySeq={}
+# for i in metrics:
+#     csv=csvdic[i]
+#     nseq=csvdic["nseq"]
+#     # Per nseq
+#     tmp=csv/nseq
+#     tmp["nseq"]=csv["nseq"]
+#     csvdic_normPerSeq[i]=tmp
+#     # By nseq
+#     tmp=csv*nseq
+#     tmp["nseq"]=csv["nseq"]
+#     csvdic_normBySeq[i]=tmp
+# for i in scores+otherparam:
+#     csvdic_normPerSeq[i]=csvdic[i]
+#     csvdic_normBySeq[i]=csvdic[i]
     
 
-# Normalize data: per/by len & nseq
-csvdic_normPerLenSeq={}
-csvdic_normByLenSeq={}
-for i in metrics:
-    csv=csvdic[i]
-    length=csvdic["len"]
-    nseq=csvdic["nseq"]
-    # Per len & nseq
-    tmp=csv/length/nseq
-    tmp["nseq"]=csv["nseq"]
-    csvdic_normPerLenSeq[i]=tmp
-    # By len & nseq
-    tmp=csv*length*nseq
-    tmp["nseq"]=csv["nseq"]
-    csvdic_normByLenSeq[i]=tmp
-for i in scores+otherparam:
-    csvdic_normPerLenSeq[i]=csvdic[i]
-    csvdic_normByLenSeq[i]=csvdic[i]
+# # Normalize data: per/by len & nseq
+# csvdic_normPerLenSeq={}
+# csvdic_normByLenSeq={}
+# for i in metrics:
+#     csv=csvdic[i]
+#     length=csvdic["len"]
+#     nseq=csvdic["nseq"]
+#     # Per len & nseq
+#     tmp=csv/length/nseq
+#     tmp["nseq"]=csv["nseq"]
+#     csvdic_normPerLenSeq[i]=tmp
+#     # By len & nseq
+#     tmp=csv*length*nseq
+#     tmp["nseq"]=csv["nseq"]
+#     csvdic_normByLenSeq[i]=tmp
+# for i in scores+otherparam:
+#     csvdic_normPerLenSeq[i]=csvdic[i]
+#     csvdic_normByLenSeq[i]=csvdic[i]
     
 
 # Change to excel directory
 os.chdir("excels/"+datatyp+"/bucket"+str(bucket))
 
 dics={"original":csvdic,
-      "normPerLen":csvdic_normPerLen,"normByLen":csvdic_normByLen,
-      "normPerSeq":csvdic_normPerSeq,"normBySeq":csvdic_normBySeq,
-      "normPerLenSeq":csvdic_normPerLenSeq,"normByLenSeq":csvdic_normByLenSeq}
+      "normPerLen":csvdic_normPerLen,"normByLen":csvdic_normByLen}
+      #"normPerSeq":csvdic_normPerSeq,"normBySeq":csvdic_normBySeq,
+      #"normPerLenSeq":csvdic_normPerLenSeq,"normByLenSeq":csvdic_normByLenSeq}
 
 # Write excels
 for typ,d in dics.items():

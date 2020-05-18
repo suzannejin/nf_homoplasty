@@ -1,23 +1,36 @@
 import sys
 import pandas as pd
+import argparse
 
-folder=sys.argv[1]  
-typ=sys.argv[2]
 
-out=folder+"/delta."+typ+".csv"
-o=open(out,"w")
+app = argparse.ArgumentParser()
+app.add_argument('folder',type=str,help="Folder where the {tc,sp,homo,...}.csv files are stored")
+app.add_argument('bucket',type=int,help="Bucket size")
+app.add_argument('nseqfile',type=str,help="path to combinedSeqs_nseq file")
+app.add_argument('typ',type=str,choices=["original","normPerLen","normByLen"],default=None)
+args=app.parse_args()
 
-# Files path
-metrics=["tc","sp","homo","whomo","whomo2","ngap","ngap2"]
-files={"sp":folder+"/sp."+typ+".csv",
-        "tc":folder+"/tc."+typ+".csv",
-        #"col":folder+"/col."+typ+".csv",
-        "homo":folder+"/homo."+typ+".csv",
-        "whomo":folder+"/whomo."+typ+".csv",
-        "whomo2":folder+"/whomo2."+typ+".csv",
-        #"len":folder+"/len."+typ+".csv",
-        "ngap":folder+"/ngap."+typ+".csv",
-        "ngap2":folder+"/ngap2."+typ+".csv"}
+
+
+metrics=["tc","sp","col","homo","whomo","whomo2","len","ngap","ngap2"]
+
+files={}
+if args.typ:
+    for metric in metrics:
+        files[metric]=args.folder+"/"+metric+"."+args.typ+".csv"
+else:
+    for metric in metrics:
+        files[metric]=args.folder+"/"+metric+".csv"
+
+
+
+# Read nseq
+fam_nseq={}
+with open(args.nseqfile) as f:
+    for line in f:
+        line=line.strip("\n")
+        fields=line.split("\t")
+        fam_nseq[fields[0]]=fields[1]
 
 # Read data frame
 dfs={}
@@ -55,6 +68,9 @@ for x in trees_rep:
 # Prepare data frame
 df={}
 df["family"]=[item for item in families for i in range(len(trees_rep))]
+df["nseq"]=[fam_nseq[item] for item in families for i in range(len(trees_rep))]
+df["mode"]=["reg_align"]*len(families)*len(trees_rep)
+df["bucket"]=[str(args.bucket)]*len(families)*len(trees_rep)
 df["aligner"]=aligners_rep*len(families)
 tree_col=trees_rep*len(families)
 df["tree1"]=[x.split(".")[0] for x in tree_col]
@@ -64,13 +80,14 @@ for metric in metrics:
     for fam in families:
         df[metric]+=list(dfs[metric].loc[fam,:])[1:]
 l=[]
-for x in ["family","aligner","tree1","tree2"]+metrics:
+for x in ["family","nseq","mode","bucket","aligner","tree1","tree2"]+metrics:
     l.append(df[x])
 lt=map(list, zip(*l))
 
-o.write(" ".join(["family","aligner","tree1","tree2"]+metrics) +"\n")
+# Print
+print(",".join(["family","nseq","mode","bucket","aligner","tree1","tree2"]+metrics))
 for i in lt:
-    tmp=" ".join([str(x) for x in i])
-    o.write(tmp+"\n")
-o.close()
+    tmp=",".join([str(x) for x in i])
+    print(tmp)
+
 

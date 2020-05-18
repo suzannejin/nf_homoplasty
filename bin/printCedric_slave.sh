@@ -23,8 +23,8 @@ declare -a familyName=${all[@]}
 ################
 ##  ALIGNERS  ##
 ################
-declare -a aligner=(CLUSTALO MAFFT-FFTNS1 MAFFT-GINSI MAFFT-SPARSECORE)
-declare -a foldname=(CO FFTNS1 GINSI SPARSE)
+declare -a aligner=(CLUSTALO) # MAFFT-FFTNS1 MAFFT-GINSI MAFFT-SPARSECORE)
+declare -a foldname=(CO) # FFTNS1 GINSI SPARSE)
 
 ################
 ##    TREES   ##
@@ -33,11 +33,10 @@ declare -a foldname=(CO FFTNS1 GINSI SPARSE)
 declare -a tree=(codnd FAMSA mafftdnd dpparttreednd0 fastaparttreednd fftns1dnd parttreednd0 parttreednd2 CLUSTALO-RANDOM)
 #declare -a tree=(dpparttreednd0)
 
-
 ###############
 ##   size    ##
 ###############
-declare -a bucket=(50 100 200 500 1000) #(1000 3000 5000 10000 20000)
+declare -a bucket=(1000) #(1000 3000 5000 10000 20000)
 #               (NA)        -> for PROG
 #               (1000 3000 5000)
 
@@ -47,7 +46,7 @@ declare -a bucket=(50 100 200 500 1000) #(1000 3000 5000 10000 20000)
 declare -a flavour=(reg_align) #"prog_align"  #"reg_align"  
 
 
-echo "family;nseq;mode;bucket;aligner;tree;tc;sp;col;homo;whomo;whomo2;len;ngap;ngap2"
+echo "family;nseq;mode;bucket;aligner;tree;slave;tc;sp;col;homo;whomo;whomo2;len;ngap;ngap2"
 for family in ${familyName[@]} ## loop for all families
 do
         nseq=$(awk -v family=$family '$1==family{print $2}' /users/cn/sjin/projects/homoplasy/homfam_info/combinedSeqs_nseqs)
@@ -62,9 +61,15 @@ do
                                 f=${foldname[$n]}
                                 cd ${base_dir}/results_fullTree_${f}_bucket${size}
 
+                                # Slave tree
+                                if [[ $align_method == "CLUSTALO" ]]
+                                then
+                                        sl="codnd"
+                                fi
+
                                 for tree_method in ${tree[@]} ## loop each tree
                                 do
-                                        printf "${family};${nseq};${mode1};${size};${align_method};${tree_method};"
+                                        printf "${family};${nseq};${mode1};${size};${align_method};${tree_method};${sl};"
 
                                         if [[ -s ./alignments/${family}.dpa_${size}.${align_method}.with.${tree_method}.tree.aln ]]; then
                                         cat ./individual_scores/${family}.${mode2}.${size}.${align_method}.${tree_method}.tc \

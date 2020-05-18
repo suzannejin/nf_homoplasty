@@ -1,14 +1,15 @@
+import collections
 import operator
 import os.path
+import re
 import sys
 
 fil=sys.argv[1]
 
 
 class Fam:
-    def __init__(self,fam,aligner,Nratio,Nnumber,usedNumber,unusedRatio,unusedNumber,totalpoint):
-        self.fam=fam
-        self.aligner=aligner
+    def __init__(self,dic,Nratio,Nnumber,usedNumber,unusedRatio,unusedNumber,totalpoint):
+        self.dic=dic  # FAM, BUCKET, ALIGNER
         self.Nratio=Nratio
         self.Nnumber=Nnumber
         self.usedNumber=usedNumber
@@ -16,9 +17,9 @@ class Fam:
         self.unusedNumber=unusedNumber
         self.totalpoint=totalpoint
 
-class Aln:
-    def __init__(self,aligner,Nratio,Nnumber,usedNumber,unusedRatio,unusedNumber,totalpoint,nfam,minacc,maxacc,deltaacc):
-        self.aligner=aligner
+class Global:
+    def __init__(self,dic,Nratio,Nnumber,usedNumber,unusedRatio,unusedNumber,totalpoint,nfam,minacc,maxacc,deltaacc):
+        self.dic=dic  # BUCKET | ALIGNER | TREE
         self.Nratio=Nratio
         self.Nnumber=Nnumber
         self.usedNumber=usedNumber
@@ -30,100 +31,77 @@ class Aln:
         self.maxacc=maxacc
         self.deltaacc=deltaacc
 
-class Global:
-    def __init__(self,Nratio,Nnumber,usedNumber,unusedRatio,unusedNumber,totalpoint,minacc,maxacc,deltaacc):
-        self.Nratio=Nratio
-        self.Nnumber=Nnumber
-        self.usedNumber=usedNumber
-        self.unusedRatio=unusedRatio
-        self.unusedNumber=unusedNumber
-        self.totalpoint=totalpoint
-        self.minacc=minacc
-        self.maxacc=maxacc
-        self.deltaacc=deltaacc
-
 
 fams=[]
-alns=[]
+glob={}
 with open(fil) as f:
     for line in f:
         line=line.strip("\n")
+        fields=line.split(" ")
 
-        if line[0:3]=="FAM":
-            fields=line.split(" ")
-            
-            # Get family name
-            tmp=fields[0].split(":")
-            tmp=[x for x in tmp if x]   
-            fam=tmp[1]
-            
-            # Get aligner name
-            aligner=fields[1][1:-2]
+        if fields[0]=="----Process":
+            continue
 
-            # Get N / total used ratio
-            Nratio=float(fields[2])
+        # Get N / total used ratio
+        Nratio=float(fields[1])
 
-            # Get number of N
-            tmp=fields[3].split("/")
-            Nnumber=int(tmp[0][1:])
-            usedNumber=int(tmp[1][:-1])
+        # Get number of N
+        tmp=fields[2][1:-1].split("/")
+        Nnumber=int(tmp[0])
+        usedNumber=int(tmp[1])
 
-            # Get unused ratio
-            unusedRatio=float(fields[6])
-            tmp=fields[7].split("/")
-            unusedNumber=int(tmp[0][1:])
-            totalpoint=int(tmp[1][:-1])
+        # Get unused ratio
+        unusedRatio=float(fields[5])
+        tmp=fields[6][1:-1].split("/")
+        unusedNumber=int(tmp[0])
+        totalpoint=int(tmp[1])
 
-            tmp=Fam(fam,aligner,Nratio,Nnumber,usedNumber,unusedRatio,unusedNumber,totalpoint)
-            fams.append(tmp)
 
-        elif line[0:3]=="ALN":
-            fields=line.split(" ")
+        if line[0:3]!="ALL":
 
-            # Get aligner name
-            tmp=fields[0].split(":")
-            tmp=[x for x in tmp if x]   
-            aligner=tmp[1]
+            # Get typ. Eg. [FAM:BUCKET:ALIGNER]:[seatoxin:50:CLUSTALO]
+            tmp=line.split("::")[0]
+            print(line)
+            match=re.findall("(\[[A-Za-z:0-9_-]+\])+",tmp) 
+            print(match)
+            typ=match[0][1:-1].split(":")
+            val=match[1][1:-1].split(":")
+            dic=collections.OrderedDict()
+            for n in range(len(typ)):
+                t=typ[n]
+                v=val[n]
+                dic[t]=v
 
-            # Get N / total used ratio
-            Nratio=float(fields[2])
+            if "FAM" in dic.keys():
+                tmp=Fam(dic,Nratio,Nnumber,usedNumber,unusedRatio,unusedNumber,totalpoint)
+                fams.append(tmp)
+            else:
+                # Get nfam
+                nfam=fields[7][1:]
 
-            # Get number of N
-            tmp=fields[3].split("/")
-            Nnumber=int(tmp[0][1:])
-            usedNumber=int(tmp[1][:-1])
+                # Get acc
+                minacc=float(fields[10])
+                maxacc=float(fields[13])
+                deltaacc=float(fields[16][:-1])
 
-            # Get unused ratio
-            unusedRatio=float(fields[6])
-            tmp=fields[7].split("/")
-            unusedNumber=int(tmp[0][1:])
-            totalpoint=int(tmp[1][:-1])
+                tmp=Global(dic,Nratio,Nratio,Nnumber,usedNumber,unusedRatio,unusedNumber,totalpoint,nfam,minacc,maxacc,deltaacc)
+                if match[0] not in glob:
+                    glob[match[0]]=[]
+                glob[match[0]].append(tmp)
 
-            # Get number of used families
-            nfam=int(fields[8][1:])
+        else:
+            # Get nfam
+            nfam=fields[7][1:]
 
-            # TC or SP score on average if the worst/best MSA is picked every time
-            minacc=float(fields[11])
-            maxacc=float(fields[14])
-            deltaacc=float(fields[-1][:-1])
+            # Get acc
+            minacc=float(fields[10])
+            maxacc=float(fields[13])
+            deltaacc=float(fields[16][:-1])
 
-            tmp=Aln(aligner,Nratio,Nnumber,usedNumber,unusedRatio,unusedNumber,totalpoint,nfam,minacc,maxacc,deltaacc)
-            alns.append(tmp)
-
-        elif line[:6]=="GLOBAL":
-            fields=line.split(" ")
-            Nratio=float(fields[1])
-            tmp=fields[2].split("/")
-            Nnumber=int(tmp[0][1:])
-            usedNumber=int(tmp[1][:-1])
-            unusedRatio=float(fields[5])
-            tmp=fields[6].split("/")
-            unusedNumber=int(tmp[0][1:])
-            totalpoint=int(tmp[1][:-1])
-            minacc=float(fields[9])
-            maxacc=float(fields[12])
-            deltaacc=float(fields[15][:-1])
-            glob=Global(Nratio,Nnumber,usedNumber,unusedRatio,unusedNumber,totalpoint,minacc,maxacc,deltaacc)
+            tmp=Global("ALL",Nratio,Nratio,Nnumber,usedNumber,unusedRatio,unusedNumber,totalpoint,nfam,minacc,maxacc,deltaacc)
+            if match[0] not in glob:
+                glob["ALL"]=[]
+            glob["ALL"].append(tmp)
 
 
 # Write output
